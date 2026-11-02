@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { apiClient } from "@/lib/api-client";
 import type { Job, Workspace } from "@/lib/domain";
 import {
   activateLocal,
@@ -18,6 +19,7 @@ import {
   type PreparationTarget,
   type PreparationPlanVersion,
   type PreparationProgress,
+  type PlanOutput,
   type PlanSettings,
 } from "@/lib/preparation-plan";
 
@@ -66,27 +68,13 @@ export function PreparationWorkspace(props: Props) {
   const jobTargetIds = useRef<Record<string, string>>({});
   const storageKey = "fieldwork-preparation-v1",
     selectionKey = `fieldwork-preparation-selection-${scope}`;
-  async function request(path: string, value?: unknown, signal?: AbortSignal) {
-    const response = await fetch(path, {
-      method: value ? "POST" : "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      ...(value ? { body: JSON.stringify(value) } : {}),
-      signal,
-    });
-    const result = await response.json();
-    if (!response.ok)
-      throw new Error(result.error || "Preparation request failed.");
-    return result;
-  }
+  const request = useMemo(() => apiClient(() => token), [token]);
   async function load() {
     setError("");
     setReady(false);
     try {
       const next: PreparationState = token
-        ? await request("/api/preparation")
+        ? await request<PreparationState>("/api/preparation")
         : JSON.parse(localStorage.getItem(storageKey) || "null") ||
           emptyPreparation();
       next.targets.forEach((target) => targetSchema.parse(target));
@@ -164,7 +152,7 @@ export function PreparationWorkspace(props: Props) {
     action: string,
     value: unknown,
   ) {
-    if (token) await request("/api/preparation", { action, value });
+    if (token) await request("/api/preparation", { body: { action, value } });
     else localStorage.setItem(storageKey, JSON.stringify(next));
     setState(next);
   }
@@ -260,9 +248,13 @@ export function PreparationWorkspace(props: Props) {
       const control = new AbortController();
       controller.current = control;
       try {
-        const result = await request(
-          "/api/preparation/generate",
-          {
+        const result = await request<{
+          output: PlanOutput;
+          metadata: PreparationPlanVersion["metadata"];
+          sources: PreparationPlanVersion["sources"];
+        }>("/api/preparation/generate", {
+          signal: control.signal,
+          body: {
             targetId: saved.id,
             settings: parsed.data,
             ...(!token
@@ -281,8 +273,7 @@ export function PreparationWorkspace(props: Props) {
                 }
               : {}),
           },
-          control.signal,
-        );
+        });
         setDraft(
           validateVersion({
             id: crypto.randomUUID(),

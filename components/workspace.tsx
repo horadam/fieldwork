@@ -1,8 +1,7 @@
 "use client";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
-  approveLocal,
   demoAnalysis,
   experienceInput,
   jobInput,
@@ -13,7 +12,9 @@ import {
 } from "@/lib/domain";
 import { ResumeImport } from "./resume-import";
 import { JobImport } from "./job-import";
-import { importLocal, type ImportBatch } from "@/lib/resume";
+import { type ImportBatch } from "@/lib/resume";
+import { apiClient } from "@/lib/api-client";
+import { accountStore, browserStore } from "@/lib/store";
 import { seed } from "@/lib/seed";
 import { interviewQuestions, weeks } from "@/lib/preparation";
 import { PreparationWorkspace } from "./preparation-workspace";
@@ -39,7 +40,6 @@ const tabIcons = [
   "M5 4h10l4 4v12H5zM9 12h6M9 16h6",
   "M4 12l5 5L20 6",
 ];
-const storageKey = "fieldwork-demo-v1";
 const navKey = "fieldwork-nav-collapsed";
 type Modal =
   // createId is minted when the form opens, so a retried save reuses it.
@@ -72,7 +72,6 @@ export default function Workspace() {
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
-  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [question, setQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -84,27 +83,42 @@ export default function Workspace() {
   const [runningJob, setRunningJob] = useState<string | null>(null);
   const [navCollapsed, setNavCollapsed] = useState(false);
 
-  useEffect(() => {
+  const request = useMemo(() => apiClient(() => activeToken.current), []);
+  const store = useMemo(
+    () =>
+      mode === "live"
+        ? accountStore(request)
+        : browserStore(() => localStorage),
+    [mode, request],
+  );
+  // The latest data, so chained operations never start from a stale render.
+  const dataRef = useRef(data);
+  function commit(next: Data) {
+    dataRef.current = next;
+    setData(next);
+  }
+  // Applies a store result only if the same session is still active.
+  async function apply(result: Promise<Data>) {
+    const owner = activeToken.current;
+    const next = await result;
+    if (activeToken.current === owner) commit(next);
+  }
+  // In-progress changes, such as a running browser analysis.
+  function update(change: (old: Data) => Data) {
+    const next = change(dataRef.current);
+    commit(next);
     try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const restored: Data = JSON.parse(saved);
-        restored.runs = restored.runs.map((r) =>
-          r.status === "running" || r.status === "pending"
-            ? {
-                ...r,
-                status: "failed",
-                error:
-                  "Execution interrupted by reload. Retry explicitly; no tasks were created.",
-              }
-            : r,
-        );
-        setData(restored);
-      }
-    } catch {
-      setError("Saved browser data could not be loaded.");
+      store.persist(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Changes were not saved.");
     }
-    setReady(true);
+  }
+  useEffect(() => {
+    const browser = browserStore(() => localStorage);
+    browser
+      .load()
+      .then(commit, (e: Error) => setError(e.message))
+      .finally(() => setReady(true));
     let config;
     try {
       config = supabaseConfig(
@@ -127,32 +141,15 @@ export default function Workspace() {
       setToken(session?.access_token || "");
       setEmail(session?.user.email || "");
       setMode(session ? "live" : "demo");
-      if (!session) {
-        try {
-          setData(
-            JSON.parse(localStorage.getItem(storageKey) || "null") || seed,
-          );
-        } catch {
-          setData(seed);
-        }
-      }
+      if (!session)
+        browser.load().then(commit, () => commit(structuredClone(seed)));
     });
     return () => listener.subscription.unsubscribe();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (ready && mode === "demo") {
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(data));
-      } catch {
-        setError("Browser storage is full; changes may not survive reload.");
-      }
-    }
-  }, [data, ready, mode]);
-  useEffect(() => {
-    if (token) {
-      setData(empty);
-      refresh(token).catch((e) => setError(e.message));
-    }
+    if (!token) return;
+    commit(empty);
+    apply(accountStore(request).load()).catch((e) => setError(e.message));
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     // Personal practice notes are isolated between demo and each authenticated account.
@@ -209,35 +206,6 @@ export default function Workspace() {
       setAiStatus(null);
     }
   }
-  async function request(
-    path: string,
-    value?: unknown,
-    override?: string,
-    signal?: AbortSignal,
-  ) {
-    const response = await fetch(path, {
-      signal,
-      method: value ? "POST" : "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(override || token
-          ? { Authorization: `Bearer ${override || token}` }
-          : {}),
-      },
-      ...(value ? { body: JSON.stringify(value) } : {}),
-    });
-    const result = await response.json();
-    if (!response.ok)
-      throw Object.assign(new Error(result.error || "Request failed."), {
-        code: result.code,
-      });
-    return result;
-  }
-  async function refresh(override?: string) {
-    const requestedToken = override || token;
-    const next = await request("/api/workspace", undefined, requestedToken);
-    if (activeToken.current === requestedToken) setData(next);
-  }
   async function act(work: () => Promise<void>) {
     setError("");
     setBusy(true);
@@ -269,41 +237,13 @@ export default function Workspace() {
               title: form.get("title"),
               body: form.get("body"),
             });
-      if (mode === "live") {
-        await request("/api/workspace", {
-          entity: current.type,
-          action: "save",
+      await apply(
+        store.save(dataRef.current, current.type, {
           id: current.value?.id,
-          createId: current.value ? undefined : current.createId,
+          createId: current.createId ?? crypto.randomUUID(),
           value,
-        });
-        await refresh();
-      } else {
-        if (
-          current.type === "experience" &&
-          !current.value &&
-          data.experience.length >= 50
-        )
-          throw new Error("Experience bank is limited to 50 entries.");
-        const id = current.value?.id || current.createId || crypto.randomUUID();
-        setData((old) =>
-          current.type === "job"
-            ? {
-                ...old,
-                jobs: [
-                  ...old.jobs.filter((x) => x.id !== id),
-                  { ...value, id } as Job,
-                ],
-              }
-            : {
-                ...old,
-                experience: [
-                  ...old.experience.filter((x) => x.id !== id),
-                  { ...current.value, ...value, id } as Experience,
-                ],
-              },
-        );
-      }
+        }),
+      );
       setModal(null);
     });
   }
@@ -311,43 +251,15 @@ export default function Workspace() {
     if (modal?.type !== "delete") return;
     const { entity, id } = modal;
     await act(async () => {
-      if (mode === "live") {
-        await request("/api/workspace", { entity, action: "delete", id });
-        await refresh();
-      } else
-        setData((old) =>
-          entity === "experience"
-            ? { ...old, experience: old.experience.filter((x) => x.id !== id) }
-            : {
-                ...old,
-                jobs: old.jobs.filter((x) => x.id !== id),
-                runs: old.runs.filter((r) => r.application_id !== id),
-                tasks: old.tasks.filter(
-                  (t) =>
-                    !old.runs.some(
-                      (r) => r.id === t.run_id && r.application_id === id,
-                    ),
-                ),
-              },
-        );
+      await apply(store.remove(dataRef.current, entity, id));
       setModal(null);
     });
   }
+  // Import errors go back to the wizard, which keeps its drafts for a retry.
   async function confirmImport(batch: ImportBatch) {
     setBusy(true);
     try {
-      if (mode === "live") {
-        await request("/api/experience/import", batch);
-        await refresh();
-      } else {
-        const next = {
-          ...data,
-          experience: importLocal(data.experience, batch),
-        };
-        // Persist before closing the review; failed saves leave drafts available for retry.
-        localStorage.setItem(storageKey, JSON.stringify(next));
-        setData(next);
-      }
+      await apply(store.importExperience(dataRef.current, batch));
     } finally {
       setBusy(false);
     }
@@ -355,26 +267,12 @@ export default function Workspace() {
   async function confirmJobImport(job: Job) {
     setBusy(true);
     try {
-      const value = jobInput.parse(job);
-      if (mode === "live") {
-        await request("/api/workspace", {
-          entity: "job",
-          action: "save",
+      await apply(
+        store.save(dataRef.current, "job", {
           createId: job.id,
-          value,
-        });
-        await refresh();
-      } else {
-        const next = {
-          ...data,
-          jobs: [
-            ...data.jobs.filter((item) => item.id !== job.id),
-            { ...value, id: job.id },
-          ],
-        };
-        localStorage.setItem(storageKey, JSON.stringify(next));
-        setData(next);
-      }
+          value: jobInput.parse(job),
+        }),
+      );
     } finally {
       setBusy(false);
     }
@@ -384,13 +282,13 @@ export default function Workspace() {
     await act(async () => {
       if (mode === "live") {
         try {
-          const result = await request("/api/analyze", {
-            applicationId: job.id,
+          const result = await request<{ runId: string }>("/api/analyze", {
+            body: { applicationId: job.id },
           });
-          await refresh();
+          await apply(store.load());
           setSelected(result.runId);
         } catch (e) {
-          await refresh();
+          await apply(store.load());
           throw e;
         } finally {
           setRunningJob(null);
@@ -414,58 +312,53 @@ export default function Workspace() {
         model: simulated ? "none" : aiStatus!.model,
         duration_ms: null,
         jd_snapshot: job.jd,
-        evidence_snapshot: structuredClone(data.experience),
+        evidence_snapshot: structuredClone(dataRef.current.experience),
       };
       const runStarted = Date.now();
-      setData((old) => ({ ...old, runs: [run, ...old.runs] }));
-      setSelected(run.id);
-      try {
-        if (simulated) {
-          const output = demoAnalysis(job, run.evidence_snapshot!);
-          setData((old) => ({
-            ...old,
-            runs: old.runs.map((r) =>
-              r.id === run.id ? { ...r, status: "completed", output } : r,
-            ),
-          }));
-        } else {
-          const result = await request("/api/analyze/local", {
-            jd: job.jd,
-            experience: run.evidence_snapshot,
-          });
-          setData((old) => ({
-            ...old,
-            runs: old.runs.map((r) =>
-              r.id === run.id
-                ? {
-                    ...r,
-                    status: "completed",
-                    output: result.output,
-                    model: result.model,
-                    provider: result.provider,
-                    prompt_version: result.promptVersion,
-                    duration_ms: result.durationMs,
-                    input_tokens: result.inputTokens,
-                    output_tokens: result.outputTokens,
-                  }
-                : r,
-            ),
-          }));
-        }
-      } catch (e) {
-        setData((old) => ({
+      const patch = (changes: Partial<Run>) =>
+        update((old) => ({
           ...old,
           runs: old.runs.map((r) =>
-            r.id === run.id
-              ? {
-                  ...r,
-                  status: "failed",
-                  error: e instanceof Error ? e.message : "Analysis failed",
-                  duration_ms: Date.now() - runStarted,
-                }
-              : r,
+            r.id === run.id ? { ...r, ...changes } : r,
           ),
         }));
+      update((old) => ({ ...old, runs: [run, ...old.runs] }));
+      setSelected(run.id);
+      try {
+        if (simulated)
+          patch({
+            status: "completed",
+            output: demoAnalysis(job, run.evidence_snapshot!),
+          });
+        else {
+          const result = await request<{
+            output: Run["output"];
+            provider: Run["provider"];
+            model: string;
+            promptVersion: string;
+            durationMs: number;
+            inputTokens: number;
+            outputTokens: number;
+          }>("/api/analyze/local", {
+            body: { jd: job.jd, experience: run.evidence_snapshot },
+          });
+          patch({
+            status: "completed",
+            output: result.output,
+            model: result.model,
+            provider: result.provider,
+            prompt_version: result.promptVersion,
+            duration_ms: result.durationMs,
+            input_tokens: result.inputTokens,
+            output_tokens: result.outputTokens,
+          });
+        }
+      } catch (e) {
+        patch({
+          status: "failed",
+          error: e instanceof Error ? e.message : "Analysis failed",
+          duration_ms: Date.now() - runStarted,
+        });
         throw e;
       } finally {
         setRunningJob(null);
@@ -473,29 +366,23 @@ export default function Workspace() {
     });
   }
   async function approve(run: Run) {
-    await act(async () => {
-      if (mode === "live") {
-        await request("/api/approve", { runId: run.id });
-        await refresh();
-      } else setData((old) => approveLocal(old, run));
-    });
+    await act(() => apply(store.approve(dataRef.current, run)));
   }
+  // Shown at once and saved in the background; only this task reverts on failure.
   async function toggleTask(id: string, done: boolean) {
-    await act(async () => {
-      if (mode === "live") {
-        await request("/api/workspace", {
-          entity: "task",
-          action: "save",
-          id,
-          value: { done },
-        });
-        await refresh();
-      } else
-        setData((old) => ({
-          ...old,
-          tasks: old.tasks.map((t) => (t.id === id ? { ...t, done } : t)),
-        }));
+    const setDone = (value: boolean) => (old: Data) => ({
+      ...old,
+      tasks: old.tasks.map((t) => (t.id === id ? { ...t, done: value } : t)),
     });
+    const optimistic = setDone(done)(dataRef.current);
+    commit(optimistic);
+    setError("");
+    try {
+      await store.setTaskDone(optimistic, id, done);
+    } catch (e) {
+      commit(setDone(!done)(dataRef.current));
+      setError(e instanceof Error ? e.message : "The task could not be saved.");
+    }
   }
   async function authenticate(
     event: FormEvent<HTMLFormElement>,
@@ -1226,7 +1113,7 @@ export default function Workspace() {
                   : "configured model"
               }
               request={(path, value, signal) =>
-                request(path, value, undefined, signal)
+                request(path, { body: value, signal })
               }
               confirm={confirmJobImport}
               close={() => setModal(null)}
@@ -1239,21 +1126,9 @@ export default function Workspace() {
                   ? `${aiStatus.provider} · ${aiStatus.model}`
                   : "configured model"
               }
-              request={async (source, signal) => {
-                const response = await fetch("/api/resume/extract", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                  },
-                  body: JSON.stringify(source),
-                  signal,
-                });
-                const result = await response.json();
-                if (!response.ok)
-                  throw new Error(result.error || "Extraction failed");
-                return result;
-              }}
+              request={(source, signal) =>
+                request("/api/resume/extract", { body: source, signal })
+              }
               confirm={confirmImport}
               close={() => setModal(null)}
             />
