@@ -129,6 +129,41 @@ export class ResumeOutputError extends Error {
   }
 }
 
+const MERGED_WARNING =
+  "Accomplishments the model listed as a separate entry were merged into this role; check them.";
+// Models sometimes split a role's bullet points into a "project" with the same
+// organization and no role or dates. Fold those back into the nearest earlier
+// role at that organization. Nothing is dropped: a split that cannot merge
+// (no matching role, or too many accomplishments) stays a separate draft.
+export function mergeOrphanedProjects(drafts: Draft[]): Draft[] {
+  const result: Draft[] = [];
+  for (const draft of drafts) {
+    const orphan =
+      draft.kind === "project" &&
+      !draft.role.trim() &&
+      !draft.dates.trim() &&
+      !!draft.organization.trim();
+    const owner = orphan
+      ? [...result]
+          .reverse()
+          .find(
+            (d) =>
+              d.kind === "role" &&
+              normalize(d.organization) === normalize(draft.organization),
+          )
+      : undefined;
+    const accomplishments = owner && [
+      ...new Set([...owner.accomplishments, ...draft.accomplishments]),
+    ];
+    if (!owner || !accomplishments || accomplishments.length > 12) {
+      result.push(draft);
+      continue;
+    }
+    owner.accomplishments = accomplishments;
+    owner.warnings = [MERGED_WARNING, ...owner.warnings, ...draft.warnings];
+  }
+  return result;
+}
 export function validateExtraction(raw: unknown, input: ResumeSource) {
   resumeSource.parse(input);
   const parsed = extractionSchema.safeParse(raw);
@@ -142,6 +177,7 @@ export function validateExtraction(raw: unknown, input: ResumeSource) {
     );
   }
   const output = parsed.data;
+  output.drafts = mergeOrphanedProjects(output.drafts);
   for (const draft of output.drafts)
     // Model warnings come first so the 8-item cap only ever drops our own
     // reminders, which the review step also states on the page.
