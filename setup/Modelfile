@@ -1,0 +1,5 @@
+# Optional local model alias for the Chat Completions agent's context window.
+# Create explicitly: ollama create fieldwork-qwen3:8b -f setup/Modelfile
+# Then set OLLAMA_MODEL=fieldwork-qwen3:8b on the application server.
+FROM qwen3:8b
+PARAMETER num_ctx 32768

@@ -1,0 +1,25 @@
+# Dependencies and generated output
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+AGENTS.md
+pnpm-lock.yaml
+
+# Local configuration and generated evaluation records
+.env*
+evals/results/
+
+# Upstream distributions must retain their original bytes
+vendor/
+public/pdf-assets/
+
+# No formatter plugins for these formats
+supabase/**/*.sql
+**/*.sh
+**/*.command
+setup/Modelfile
