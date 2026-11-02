@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   approveLocal,
   demoAnalysis,
+  fitCoverage,
   validateAnalysis,
   type Analysis,
   type Run,
@@ -111,5 +112,71 @@ describe("offline preview and evaluation dataset", () => {
       ),
     ).toBe(true);
     expect(out.summary).toContain("No model was called");
+  });
+});
+describe("offline preview copy", () => {
+  it("does not double punctuation from JD lines", () => {
+    const job = {
+      ...seed.jobs[0],
+      jd: "Build products end to end with TypeScript.\nShip LLM features; iterate quickly!",
+    };
+    const out = demoAnalysis(job, []);
+    expect(out.questions[0].text).toBe(
+      "Which real example best demonstrates: Build products end to end with TypeScript?",
+    );
+    expect(out.tasks[0].detail).toMatch(
+      /^Review: Build .* TypeScript\. Identify/,
+    );
+    expect(out.tasks[2].detail).toMatch(/^Review: iterate quickly\. Identify/);
+    for (const text of [
+      ...out.questions.map((q) => q.text),
+      ...out.tasks.map((t) => t.detail),
+    ])
+      expect(text).not.toMatch(/[.!?][.?]/);
+  });
+});
+describe("fit coverage", () => {
+  it("counts requirements by status", () => {
+    const analysis: Analysis = {
+      summary: "Summary.",
+      requirements: [
+        {
+          id: "r1",
+          requirement: "A",
+          status: "supported",
+          explanation: "x",
+          evidenceIds: ["e1"],
+        },
+        {
+          id: "r2",
+          requirement: "B",
+          status: "supported",
+          explanation: "x",
+          evidenceIds: ["e1"],
+        },
+        {
+          id: "r3",
+          requirement: "C",
+          status: "partial",
+          explanation: "x",
+          evidenceIds: ["e1"],
+        },
+        {
+          id: "r4",
+          requirement: "D",
+          status: "unsupported",
+          explanation: "x",
+          evidenceIds: [],
+        },
+      ],
+      questions: [],
+      tasks: [],
+    };
+    expect(fitCoverage(analysis)).toEqual({
+      supported: 2,
+      partial: 1,
+      unsupported: 1,
+      total: 4,
+    });
   });
 });

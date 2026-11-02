@@ -139,6 +139,20 @@ export function approveLocal(state: Workspace, run: Run): Workspace {
   };
 }
 
+export type FitCoverage = Record<
+  Analysis["requirements"][number]["status"],
+  number
+> & { total: number };
+
+export function fitCoverage(analysis: Analysis): FitCoverage {
+  const coverage = { supported: 0, partial: 0, unsupported: 0, total: 0 };
+  for (const r of analysis.requirements) {
+    coverage[r.status] += 1;
+    coverage.total += 1;
+  }
+  return coverage;
+}
+
 // Deliberately conservative offline preview. This is NOT an LLM evaluation or inference engine.
 export function demoAnalysis(job: Job, evidence: Experience[]): Analysis {
   const lines = job.jd
@@ -146,6 +160,9 @@ export function demoAnalysis(job: Job, evidence: Experience[]): Analysis {
     .map((s) => s.trim())
     .filter((s) => s.length > 8)
     .slice(0, 8);
+  // JD lines often end in punctuation; strip it so templates add their own.
+  const clause = (line: string, max: number) =>
+    line.slice(0, max).replace(/[\s.,;:!?]+$/, "");
   return validateAnalysis(
     {
       summary:
@@ -159,12 +176,12 @@ export function demoAnalysis(job: Job, evidence: Experience[]): Analysis {
         evidenceIds: [],
       })),
       questions: lines.slice(0, 4).map((line, i) => ({
-        text: `Which real example best demonstrates: ${line.slice(0, 250)}?`,
+        text: `Which real example best demonstrates: ${clause(line, 250)}?`,
         requirementId: `r${i + 1}`,
       })),
       tasks: lines.slice(0, 4).map((line, i) => ({
         title: `Prepare evidence for requirement ${i + 1}`,
-        detail: `Review: ${line.slice(0, 700)}. Identify your contribution, a tradeoff, and a defensible outcome.`,
+        detail: `Review: ${clause(line, 700)}. Identify your contribution, a tradeoff, and a defensible outcome.`,
         requirementId: `r${i + 1}`,
       })),
     },

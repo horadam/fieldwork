@@ -63,7 +63,7 @@ Fetch/extraction endpoints use the existing authenticated or explicitly enabled 
 2. Inspect the actual extracted text before sending it to the configured model. Compare columns, dates, missing pages and characters with the original. Switch to pasted text to correct parsing problems.
 3. Generate drafts. Review each role/project, edit the saved title/details and structured fields, and confirm that dates, metrics and ownership match your actual work. Missing fields stay empty. Resume citations and page matching are not requested or required.
 4. Select entries and confirm. Likely duplicates start deselected. Checking a duplicate explicitly imports a separate record; no merge/overwrite occurs. Selected entries and import metadata are saved; PDF files and complete extracted resumes are not stored. Cancel/reload discards unconfirmed drafts. A failed save retains drafts and stable confirmation identifiers for retry.
-5. Add a job under **Applications**, choose **Analyze fit**, review requirements/evidence and approve the preparation plan. Generated tasks are proposals until approval. **Simulated preview** is an explicit separate option that makes no model call.
+5. Add a job under **Applications**, select it in the list, and choose **Analyze fit**. The **Fit analysis** tab shows requirement coverage (met / partial / gap) with the evidence behind each match; review it, then approve the plan from **Prep plan**. Generated tasks are proposals until approval. **Simulated preview** (in the ⋯ menu) is an explicit separate option that makes no model call.
 
 The PDF is parsed in browser memory with the PDF.js compatibility ESM module and its same-origin worker. Only extracted text/page text is sent to the backend. Encrypted, malformed, scanned/empty, oversized, and partially unreadable documents get errors or warnings with a pasted-text fallback. OCR and DOCX are deferred. Multi-column ordering is not certified automatically.
 
@@ -71,7 +71,7 @@ The bank supports 50 entries. Local confirmation writes the complete validated b
 
 ## Job-specific preparation targets
 
-Choose **Applications → Prepare for this job**, or open Interview practice and choose **Create preparation group** for one to three applications. The shared **Preparing for…** selector controls Interview practice, Study plan, and Preparation tasks. General practice retains your existing questions, notes, self-scores and general roadmap; old date-specific wording is removed. Selection is remembered separately for browser storage and each account.
+Choose **Applications → ⋯ → Prepare for this job**, or open Interview practice and choose **Create preparation group** for one to three applications. The shared **Preparing for…** selector controls Interview practice, Study plan, and Preparation tasks. General practice retains your existing questions, notes, self-scores and general roadmap; old date-specific wording is removed. Selection is remembered separately for browser storage and each account.
 
 1. Complete a current **real** analysis for every selected job. The setup shows missing/outdated analyses with explicit Run real analysis buttons; nothing runs just from selecting a target. Old browser runs without a saved JD snapshot need re-analysis once. Simulated previews cannot feed real preparation generation.
 2. Choose start date, **one week**, **two weeks**, or an interview date, and 0.5–40 hours/week. Defaults are today, one week and 12 hours/week. The interview day is included; partial weeks are prorated. Specific dates may be up to one year from the start.

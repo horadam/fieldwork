@@ -17,6 +17,7 @@ import { importLocal, type ImportBatch } from "@/lib/resume";
 import { seed } from "@/lib/seed";
 import { interviewQuestions, weeks } from "@/lib/preparation";
 import { PreparationWorkspace } from "./preparation-workspace";
+import { ApplicationsView } from "./applications-view";
 import { supabaseConfig } from "@/lib/supabase-config";
 
 const empty: Data = { jobs: [], experience: [], runs: [], tasks: [] };
@@ -28,7 +29,17 @@ const tabs = [
   "Study plan",
   "Preparation tasks",
 ];
+// 24px stroke paths, one per tab, shown alone when the sidebar is collapsed.
+const tabIcons = [
+  "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  "M4 8h16v11H4zM9 8V5h6v3",
+  "M5 5h14v4H5zM5 11h14v4H5zM5 17h9",
+  "M4 5h16v10H9l-5 4z",
+  "M5 4h10l4 4v12H5zM9 12h6M9 16h6",
+  "M4 12l5 5L20 6",
+];
 const storageKey = "fieldwork-demo-v1";
+const navKey = "fieldwork-nav-collapsed";
 type Modal =
   | { type: "job"; value?: Job }
   | { type: "experience"; value?: Experience }
@@ -130,6 +141,7 @@ export default function Workspace() {
   const [practiceReady, setPracticeReady] = useState(false);
   const [practiceKey, setPracticeKey] = useState("");
   const [runningJob, setRunningJob] = useState<string | null>(null);
+  const [navCollapsed, setNavCollapsed] = useState(false);
 
   useEffect(() => {
     try {
@@ -228,6 +240,23 @@ export default function Workspace() {
       }
     }
   }, [answers, study, scores, mode, email, practiceReady, practiceKey]);
+
+  useEffect(() => {
+    try {
+      setNavCollapsed(localStorage.getItem(navKey) === "1");
+    } catch {
+      /* The expanded navigation is the default. */
+    }
+  }, []);
+  function toggleNav() {
+    const next = !navCollapsed;
+    setNavCollapsed(next);
+    try {
+      localStorage.setItem(navKey, next ? "1" : "0");
+    } catch {
+      /* Preference only lasts for this page view. */
+    }
+  }
 
   useEffect(() => {
     void loadStatus();
@@ -573,10 +602,43 @@ export default function Workspace() {
   ];
 
   return (
-    <div className="shell">
+    <div className={`shell ${navCollapsed ? "collapsed" : ""}`}>
       <aside className="sidebar">
-        <div className="brand">
-          fieldwork<span>↗</span>
+        <div className="sidebar-top">
+          <div className="brand" aria-label="fieldwork">
+            <span className="brand-full" aria-hidden="true">
+              fieldwork
+            </span>
+            <span className="brand-short" aria-hidden="true">
+              f
+            </span>
+            <span className="brand-mark" aria-hidden="true">
+              ↗
+            </span>
+          </div>
+          <button
+            className="nav-toggle"
+            aria-label={
+              navCollapsed ? "Expand navigation" : "Collapse navigation"
+            }
+            aria-expanded={!navCollapsed}
+            title={navCollapsed ? "Expand navigation" : "Collapse navigation"}
+            onClick={toggleNav}
+          >
+            <svg
+              aria-hidden="true"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d={navCollapsed ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} />
+            </svg>
+          </button>
         </div>
         <div className="eyebrow">Your next chapter</div>
         <nav aria-label="Workspace">
@@ -584,14 +646,29 @@ export default function Workspace() {
             <button
               key={name}
               className={`nav ${tab === i ? "active" : ""}`}
+              aria-current={tab === i ? "page" : undefined}
+              title={navCollapsed ? name : undefined}
               onClick={() => {
                 setTab(i);
                 setSelected(null);
                 setError("");
               }}
             >
-              <span className="num">0{i + 1}</span>
-              {name}
+              <svg
+                className="nav-icon"
+                aria-hidden="true"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d={tabIcons[i]} />
+              </svg>
+              <span className="nav-label">{name}</span>
             </button>
           ))}
         </nav>
@@ -603,9 +680,6 @@ export default function Workspace() {
             <br />
             Better conversations.
           </p>
-          <span className="mode">
-            {mode === "demo" ? "Browser workspace" : "Private workspace"}
-          </span>
         </div>
       </aside>
       <main className="main">
@@ -614,7 +688,47 @@ export default function Workspace() {
             CAREER WORKSPACE <span className="muted">/ {tabs[tab]}</span>
           </p>
           <div className="actions">
-            <span className="tiny muted">{email || "Browser storage"}</span>
+            <details className="status-pill">
+              <summary>
+                <span
+                  className={`status-dot ${aiStatus?.ready ? "ready" : ""}`}
+                  aria-hidden="true"
+                />
+                {email || "Browser storage"} ·{" "}
+                {aiStatus
+                  ? `${aiStatus.provider} ${aiStatus.model} ${aiStatus.ready ? "ready" : "unavailable"}`
+                  : "model status unavailable"}
+              </summary>
+              <div className="status-panel">
+                <p className="tiny">
+                  <strong>
+                    {mode === "demo"
+                      ? "Browser workspace"
+                      : "Private workspace"}
+                  </strong>
+                  <br />
+                  {mode === "demo"
+                    ? "Records are saved in this browser. Real analysis sends the selected JD and experience to the configured model. Simulated preview calls no model."
+                    : `Signed in as ${email}. Records are saved to your Supabase workspace.`}
+                </p>
+                <p className="tiny">
+                  <strong>
+                    {aiStatus
+                      ? `${aiStatus.provider} · ${aiStatus.model}`
+                      : "Model status unavailable"}
+                  </strong>
+                  {aiStatus?.message && (
+                    <>
+                      <br />
+                      {aiStatus.message}
+                    </>
+                  )}
+                </p>
+                <button className="button secondary small" onClick={loadStatus}>
+                  Refresh model status
+                </button>
+              </div>
+            </details>
             {mode === "live" ? (
               <button
                 className="button secondary small"
@@ -680,30 +794,12 @@ export default function Workspace() {
             </div>
           )}
         </header>
-        {mode === "demo" && (
-          <div className="notice">
-            Browser workspace · Records are saved in this browser. Real analysis
-            sends the selected JD and experience to the configured model.
-            Simulated preview calls no model.
-          </div>
-        )}
-        <div className="notice">
-          <strong>
-            {aiStatus
-              ? `${aiStatus.provider} · ${aiStatus.model}`
-              : "Model status unavailable"}
-          </strong>{" "}
-          · {aiStatus?.message}{" "}
-          <button className="button secondary small" onClick={loadStatus}>
-            Refresh model status
-          </button>
-        </div>
         {error && (
           <div role="alert" className="notice error">
             {error}
           </div>
         )}
-        {busy && (
+        {busy && !(runningJob && tab === 2) && (
           <div role="status" className="notice">
             {runningJob
               ? "Analysis running. You can review other sections while you wait."
@@ -824,207 +920,26 @@ export default function Workspace() {
         )}
 
         {tab === 2 && (
-          <>
-            <label className="sr-only" htmlFor="search">
-              Search applications
-            </label>
-            <input
-              id="search"
-              className="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search company or role…"
-            />
-            {data.jobs.length === 0 ? (
-              <div className="empty">
-                <h2>Your search starts here.</h2>
-                <p className="muted">
-                  Add a job description to build a preparation plan.
-                </p>
-                <button
-                  className="button"
-                  onClick={() => setModal({ type: "job" })}
-                >
-                  Add your first application
-                </button>
-              </div>
-            ) : (
-              <div className="job-list">
-                {data.jobs
-                  .filter((j) =>
-                    `${j.company} ${j.role}`
-                      .toLowerCase()
-                      .includes(search.toLowerCase()),
-                  )
-                  .map((job) => (
-                    <article className="job-card" key={job.id}>
-                      <div className="actions">
-                        <span className="badge">{job.stage}</span>
-                      </div>
-                      <p className="job-company">{job.company}</p>
-                      <h2>{job.role}</h2>
-                      {job.notes && <p className="tiny muted">{job.notes}</p>}
-                      <details>
-                        <summary className="tiny">Job description</summary>
-                        <p className="tiny" style={{ whiteSpace: "pre-wrap" }}>
-                          {job.jd}
-                        </p>
-                      </details>
-                      <div className="actions">
-                        <button
-                          className="button small"
-                          disabled={busy || !aiStatus?.ready}
-                          onClick={() => runJob(job)}
-                        >
-                          Analyze fit
-                        </button>
-                        <button
-                          className="button secondary small"
-                          disabled={busy}
-                          onClick={() => {
-                            setPreparationJob(job.id);
-                            setTab(3);
-                          }}
-                        >
-                          Prepare for this job
-                        </button>
-                        {mode === "demo" && (
-                          <button
-                            className="button secondary small"
-                            disabled={busy}
-                            onClick={() => runJob(job, true)}
-                          >
-                            Simulated preview
-                          </button>
-                        )}
-                        <button
-                          className="button secondary small"
-                          onClick={() => setModal({ type: "job", value: job })}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="button danger small"
-                          onClick={() =>
-                            setModal({
-                              type: "delete",
-                              entity: "job",
-                              id: job.id,
-                            })
-                          }
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      {data.runs
-                        .filter((r) => r.application_id === job.id)
-                        .map((r) => (
-                          <button
-                            key={r.id}
-                            className="button secondary small"
-                            onClick={() => setSelected(r.id)}
-                          >
-                            {r.status} ·{" "}
-                            {new Date(r.created_at).toLocaleString()} · View run
-                          </button>
-                        ))}
-                    </article>
-                  ))}
-              </div>
-            )}
-            {activeRun && (
-              <section className="card" style={{ marginTop: 24 }}>
-                <div
-                  className="actions"
-                  style={{ justifyContent: "space-between", marginBottom: 20 }}
-                >
-                  <h2 style={{ margin: 0 }}>Analysis & preparation</h2>
-                  <button
-                    className="button secondary small"
-                    onClick={() => setSelected(null)}
-                  >
-                    Close run
-                  </button>
-                </div>
-                <p className="tiny muted">
-                  {activeRun.status} ·{" "}
-                  {new Date(activeRun.created_at).toLocaleString()} ·{" "}
-                  {activeRun.prompt_version} ·{" "}
-                  {activeRun.provider ||
-                    (activeRun.model === "none" ? "simulated" : "openai")}{" "}
-                  · {activeRun.model} ·{" "}
-                  {activeRun.status === "running" ||
-                  activeRun.status === "pending"
-                    ? "In progress"
-                    : activeRun.duration_ms && activeRun.duration_ms > 0
-                      ? `${activeRun.duration_ms} ms`
-                      : "Duration not recorded"}
-                </p>
-                {activeRun.error && <p role="alert">{activeRun.error}</p>}
-                {activeRun.output && (
-                  <>
-                    <p>{activeRun.output.summary}</p>
-                    {activeRun.output.requirements.map((r) => (
-                      <div className="list-row" key={r.id}>
-                        <div className="grow">
-                          <span className={`badge ${r.status}`}>
-                            {activeRun.model === "none"
-                              ? "Not assessed"
-                              : r.status}
-                          </span>
-                          <h3 style={{ marginTop: 10 }}>{r.requirement}</h3>
-                          <p className="tiny muted">{r.explanation}</p>
-                          {r.evidenceIds.map((id) => {
-                            const e = (activeRun.evidence_snapshot || []).find(
-                              (x) => x.id === id,
-                            );
-                            return (
-                              <div className="evidence" key={id}>
-                                <strong>{e?.title || id}</strong>
-                                <br />
-                                {e?.body || "Evidence unavailable"}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                    <h3 style={{ marginTop: 24 }}>Interview questions</h3>
-                    <ol>
-                      {activeRun.output.questions.map((q, i) => (
-                        <li key={i}>{q.text}</li>
-                      ))}
-                    </ol>
-                    <h3>Proposed study tasks</h3>
-                    {activeRun.output.tasks.map((t, i) => (
-                      <div className="list-row" key={i}>
-                        <div>
-                          <strong>{t.title}</strong>
-                          <p className="tiny muted">{t.detail}</p>
-                        </div>
-                      </div>
-                    ))}
-                    <button
-                      className="button"
-                      disabled={
-                        busy ||
-                        data.tasks.some((t) => t.run_id === activeRun.id)
-                      }
-                      onClick={() => approve(activeRun)}
-                    >
-                      {data.tasks.some((t) => t.run_id === activeRun.id)
-                        ? "Plan approved"
-                        : "Approve preparation plan"}
-                    </button>
-                    <p className="tiny muted" style={{ marginTop: 10 }}>
-                      Approval saves these tasks. Review the evidence and
-                      suggestions first.
-                    </p>
-                  </>
-                )}
-              </section>
-            )}
-          </>
+          <ApplicationsView
+            workspace={data}
+            mode={mode}
+            busy={busy}
+            aiReady={!!aiStatus?.ready}
+            runningJob={runningJob}
+            selectedRun={selected}
+            onSelectRun={setSelected}
+            onAnalyze={(job, simulated) => runJob(job, simulated)}
+            onPrepare={(job) => {
+              setPreparationJob(job.id);
+              setTab(3);
+            }}
+            onEdit={(job) => setModal({ type: "job", value: job })}
+            onDelete={(job) =>
+              setModal({ type: "delete", entity: "job", id: job.id })
+            }
+            onApprove={approve}
+            onAdd={() => setModal({ type: "job" })}
+          />
         )}
 
         {tab === 1 && (
