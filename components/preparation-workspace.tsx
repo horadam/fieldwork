@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
+import type { TabId } from "./shell/tabs";
 import type { Job, Workspace } from "@/lib/domain";
 import {
   activateLocal,
@@ -24,7 +25,7 @@ import {
 } from "@/lib/preparation-plan";
 
 type Props = {
-  section: number;
+  section: TabId;
   workspace: Workspace;
   token: string;
   scope: string;
@@ -33,6 +34,9 @@ type Props = {
   onGeneralChange: (general: boolean) => void;
   analyze: (job: Job) => Promise<void>;
   toggleLegacy: (id: string, done: boolean) => Promise<void>;
+  // The shell reports progress and errors for analyze and toggleLegacy.
+  shellBusy: boolean;
+  savingTask: string | null;
   provider: string;
 };
 const rubric = ["Clarity", "Correctness", "Depth", "Tradeoffs", "Ownership"];
@@ -461,7 +465,7 @@ export function PreparationWorkspace(props: Props) {
       </div>
     );
   }
-  if (![3, 4, 5].includes(props.section)) return null;
+  if (!["practice", "study", "tasks"].includes(props.section)) return null;
   return (
     <section className="preparation-workspace">
       <div className="card">
@@ -727,12 +731,10 @@ export function PreparationWorkspace(props: Props) {
                 {workspace.jobs.find((j) => j.id === problem.jobId) && (
                   <button
                     className="button secondary small"
-                    disabled={!!busy}
+                    disabled={!!busy || props.shellBusy}
                     onClick={() =>
-                      void work("Running real job analysis…", () =>
-                        props.analyze(
-                          workspace.jobs.find((j) => j.id === problem.jobId)!,
-                        ),
+                      void props.analyze(
+                        workspace.jobs.find((j) => j.id === problem.jobId)!,
                       )
                     }
                   >
@@ -1007,7 +1009,7 @@ export function PreparationWorkspace(props: Props) {
             {plan.metadata.model}
             {edits[plan.id] && " · Unsaved answer or score changes"}
           </div>
-          {props.section === 3 && selectedQuestion && progress && (
+          {props.section === "practice" && selectedQuestion && progress && (
             <section className="card form practice">
               <label>
                 Practice question
@@ -1109,7 +1111,7 @@ export function PreparationWorkspace(props: Props) {
               </button>
             </section>
           )}
-          {props.section === 4 && schedule && (
+          {props.section === "study" && schedule && (
             <>
               <p>
                 {schedule.used} / {schedule.capacity} minutes scheduled ·{" "}
@@ -1138,7 +1140,7 @@ export function PreparationWorkspace(props: Props) {
               ))}
             </>
           )}
-          {props.section === 5 && schedule && (
+          {props.section === "tasks" && schedule && (
             <section className="card">
               <div className="actions">
                 <label>
@@ -1197,44 +1199,47 @@ export function PreparationWorkspace(props: Props) {
               )}
             </section>
           )}
-          {[4, 5].includes(props.section) && schedule && (
-            <section className="card">
-              <h3>Deferred · outside the schedule</h3>
-              {schedule.deferred.length ? (
-                checklist(
-                  schedule.deferred.filter((id) => {
-                    const a = plan.output.activities.find((a) => a.id === id)!;
-                    return (
-                      props.section !== 5 ||
-                      ((!jobFilter ||
-                        a.refs.some((r) => r.jobId === jobFilter)) &&
-                        (!typeFilter || a.type === typeFilter) &&
-                        (!doneFilter ||
-                          !!progress?.done[id] === (doneFilter === "done")))
-                    );
-                  }),
-                )
-              ) : (
-                <p>No selected activities were deferred.</p>
-              )}
-              <h3>Requirements without scheduled work</h3>
-              {plan.sources.flatMap((source) =>
-                source.analysis.requirements
-                  .filter(
-                    (r) => !schedule.covered.has(`${source.jobId}:${r.id}`),
+          {(props.section === "study" || props.section === "tasks") &&
+            schedule && (
+              <section className="card">
+                <h3>Deferred · outside the schedule</h3>
+                {schedule.deferred.length ? (
+                  checklist(
+                    schedule.deferred.filter((id) => {
+                      const a = plan.output.activities.find(
+                        (a) => a.id === id,
+                      )!;
+                      return (
+                        props.section !== "tasks" ||
+                        ((!jobFilter ||
+                          a.refs.some((r) => r.jobId === jobFilter)) &&
+                          (!typeFilter || a.type === typeFilter) &&
+                          (!doneFilter ||
+                            !!progress?.done[id] === (doneFilter === "done")))
+                      );
+                    }),
                   )
-                  .map((r) => (
-                    <p className="tiny" key={`${source.jobId}:${r.id}`}>
-                      {source.company} · {r.requirement}
-                    </p>
-                  )),
-              )}
-              <p className="tiny muted">
-                Scheduled coverage does not establish skill mastery or complete
-                interview readiness.
-              </p>
-            </section>
-          )}
+                ) : (
+                  <p>No selected activities were deferred.</p>
+                )}
+                <h3>Requirements without scheduled work</h3>
+                {plan.sources.flatMap((source) =>
+                  source.analysis.requirements
+                    .filter(
+                      (r) => !schedule.covered.has(`${source.jobId}:${r.id}`),
+                    )
+                    .map((r) => (
+                      <p className="tiny" key={`${source.jobId}:${r.id}`}>
+                        {source.company} · {r.requirement}
+                      </p>
+                    )),
+                )}
+                <p className="tiny muted">
+                  Scheduled coverage does not establish skill mastery or
+                  complete interview readiness.
+                </p>
+              </section>
+            )}
         </>
       )}
       {target && !plan && !draft && (
@@ -1243,7 +1248,7 @@ export function PreparationWorkspace(props: Props) {
           budget, then generate and review a plan.
         </p>
       )}
-      {target && props.section === 5 && (
+      {target && props.section === "tasks" && (
         <section className="card">
           <h3>Earlier analysis tasks</h3>
           <p className="tiny muted">
@@ -1261,12 +1266,10 @@ export function PreparationWorkspace(props: Props) {
               <label className="check" key={task.id}>
                 <input
                   type="checkbox"
-                  disabled={!!busy}
+                  disabled={props.savingTask === task.id}
                   checked={task.done}
                   onChange={(e) =>
-                    void work("Saving earlier task…", () =>
-                      props.toggleLegacy(task.id, e.target.checked),
-                    )
+                    void props.toggleLegacy(task.id, e.target.checked)
                   }
                 />
                 <div>

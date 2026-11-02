@@ -1,3 +1,6 @@
+// Sample general-practice content: the author's own interview preparation set,
+// shown when no preparation target is selected. Replace it with yours; nothing
+// here is generated or derived from the experience bank.
 export const interviewQuestions = [
   {
     question: "Tell me about yourself and why this role interests you.",
@@ -105,3 +108,32 @@ export const weeks = [
     ],
   },
 ];
+
+// Overview "next steps" and the general prep agenda, part of the same sample.
+export const overviewSteps = [
+  {
+    title: "Own your story",
+    detail:
+      "Clarify your contribution, one tradeoff, and evidence of the outcome.",
+    target: "practice",
+  },
+  {
+    title: "Know your gaps",
+    detail: "Review Next.js, Supabase, and the server-to-database path.",
+    target: "study",
+  },
+  {
+    title: "Build something useful",
+    detail: "Turn a real job description into a grounded preparation workflow.",
+    target: "applications",
+  },
+] as const;
+export const prepAgenda = [
+  ["20 min", "Introduction and motivation"],
+  ["45 min", "Two real AI product stories"],
+  ["30 min", "Eight likely questions"],
+  ["20 min", "Stack and evaluation refresh"],
+  ["25 min", "Mock interview and retry"],
+  ["10 min", "Your questions and logistics"],
+] as const;
+export const agendaMinutes = 150;
