@@ -51,7 +51,7 @@ stateDiagram-v2
   Draft --> Draft: Edit and recalculate schedule without inference
   Draft --> Active: Explicit activation succeeds
   Draft --> [*]: Discard or reload
-  Active --> Active: Save notes, scores or completion
+  Active --> Active: Autosave notes and scores, or save completion
   Active --> Previous: A replacement version is activated
   Previous --> Previous: Inspect saved version and progress read-only
   Active --> [*]: Delete target
@@ -107,8 +107,9 @@ versions and progress. See the [data model](data-model.md).
 
 ## Implementation
 
-- [Target/review/practice UI](../../components/preparation-workspace.tsx),
-  [general practice](../../lib/preparation.ts), and
+- [Target/review/practice UI](../../components/preparation-workspace.tsx) and
+  [its parts](../../components/preparation/),
+  [general practice](../../lib/sample-practice.ts), and
   [source validation, scheduling and local activation](../../lib/preparation-plan.ts).
 - [Generation route](../../app/api/preparation/generate/route.ts),
   [generation call](../../lib/preparation-generation.ts),

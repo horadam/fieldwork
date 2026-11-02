@@ -81,7 +81,8 @@ it does not fall back to anonymous access.
 
 ## Implementation
 
-- [Browser client, auth subscription and sign-in form](../../components/workspace.tsx),
+- [Browser client and auth subscription](../../components/hooks/use-workspace-data.ts),
+  [sign-in form](../../components/modals/auth-form.tsx),
   [public configuration validation](../../lib/supabase-config.ts), and
   [server identity/access checks](../../lib/server.ts).
 - [Workspace API](../../app/api/workspace/route.ts),

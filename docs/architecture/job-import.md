@@ -102,5 +102,6 @@ log-free browser path.
   [network/HTML/Gem handling](../../lib/job-page.ts).
 - [Extraction route](../../app/api/jobs/extract/route.ts),
   [structured extraction](../../lib/job-extraction.ts),
-  [confirmation and browser persistence](../../components/workspace.tsx), and
+  [confirmation](../../components/hooks/use-workspace-data.ts) and
+  [browser persistence](../../lib/store/index.ts), and
   [account creation retry handling](../../app/api/workspace/route.ts).

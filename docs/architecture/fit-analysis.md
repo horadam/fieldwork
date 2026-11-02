@@ -18,7 +18,7 @@ sequenceDiagram
   participant Agent as analyze() and read-only tools
   participant Model as Configured Ollama or OpenAI
   alt Explicit simulated preview in browser mode
-    User->>UI: Click Simulated preview
+    User->>UI: Choose ⋯ → Simulated preview (no model)
     UI->>UI: demoAnalysis() creates template output
     UI->>UI: Persist labeled simulated run in browser storage
     Note over UI,Model: No model request, cannot feed real preparation generation
@@ -83,8 +83,8 @@ sequenceDiagram
 - Browser abort requests and backend cancellation signals are best effort. They
   cannot undo committed writes or guarantee that all provider computation stops.
 
-The analysis itself creates no approved tasks. **Approve preparation plan** in the
-analysis result uses the earlier approval path (`/api/approve` or `approveLocal`),
+The analysis itself creates no approved tasks. **Approve plan** in the
+approve bar under the Fit analysis and Prep plan tabs uses the earlier approval path (`/api/approve` or `approveLocal`),
 copying proposed tasks idempotently into earlier analysis tasks. The newer
 [preparation lifecycle](preparation-lifecycle.md) is a separate generation and
 activation flow and requires real, current analyses; it does not require that
@@ -92,11 +92,13 @@ earlier task approval first.
 
 ## Implementation
 
-- [UI run handling](../../components/workspace.tsx) and
+- [Applications view: list, Fit analysis and Prep plan tabs](../../components/applications-view.tsx),
+  [run handling](../../components/hooks/use-workspace-data.ts) and
   [schemas, reference validation and simulation](../../lib/domain.ts).
 - [Account route](../../app/api/analyze/route.ts),
   [browser-workspace route](../../app/api/analyze/local/route.ts),
-  [agent](../../lib/agent.ts), [provider adapter](../../lib/ai-provider.ts), and
+  [agent](../../lib/agent.ts), [provider adapter](../../lib/ai-provider.ts),
+  [usage recording](model-calls.md), and
   [earlier task approval](../../app/api/approve/route.ts).
 - [Initial database functions](../../supabase/migrations/001_workspace.sql) and
   [current reservation/provider update](../../supabase/migrations/002_resume_import.sql).

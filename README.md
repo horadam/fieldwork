@@ -1,22 +1,51 @@
 # Fieldwork · Job Search Workspace
 
-Next.js / React / TypeScript interview preparation workspace. Storage and inference are independent: use browser persistence without Supabase, or an authenticated Supabase account. Resume extraction and JD analysis default to an installed local Ollama model. OpenAI remains available through server configuration.
+**Interview preparation grounded in your real experience.** Import your resume into an experience bank you confirm line by line. Then check each job description against it: every requirement is marked met, partial or gap, and linked to the evidence behind it. Finally, turn those gaps into a scheduled preparation plan you review before anything is saved.
+
+![Applications: a job list with fit coverage, requirement-by-requirement evidence, and an approve bar](docs/images/applications.jpg)
+
+```mermaid
+flowchart LR
+  R["Resume PDF or text"] -->|"extract, review, confirm"| B[("Experience bank")]
+  J["Job URL or text"] -->|"fetch, extract, confirm"| A["Applications"]
+  B --> F["Fit analysis: met / partial / gap, with evidence IDs"]
+  A --> F
+  F -->|"approve"| T["Tasks"]
+  F -->|"generate, review, activate"| P["Preparation plan: questions, schedule, progress"]
+```
+
+**What makes it different**
+
+- **Nothing the model says is trusted by default.** Output is validated with Zod, and every evidence and requirement ID is checked against the inputs. Drafts stay drafts until you confirm them.
+- **Runs locally or hosted.** Local Ollama (`qwen3:8b`) is the default, and OpenAI is an option. Storage is either your browser or a Supabase account protected by row-level security. Storage and model choice are independent.
+- **Engineered for failure.** Every model call has a deadline, makes exactly one attempt and has no fallback. Errors are sanitized. Duration and tokens are recorded even when a call fails. Retries are idempotent, and the hosted plan has hourly quotas.
+- **Measured.** 339 tests cover routes, UI, Postgres RLS (in PGlite) and SSRF-safe fetching. Labelled evals cover resume, job and plan generation; see [the results and known weaknesses](evals/results.md).
 
 For a code-guided walkthrough with diagrams, start with the [architecture and flow index](docs/architecture/README.md).
+
+## Quick start
+
+```sh
+pnpm install --frozen-lockfile
+cp .env.example .env.local   # keep your existing file if you have one
+ollama pull qwen3:8b         # optional: real analysis needs a local model
+pnpm dev                     # http://127.0.0.1:3000
+```
+
+The workspace opens with synthetic sample data in browser storage, and **Simulated preview** shows the full flow without any model. The sections below cover model setup, every flow, and optional Supabase accounts.
 
 ## Local setup
 
 Use Node 22.13+ (or a current supported Node 24 release) and pnpm 11.25.0.
 
 ```sh
-cd job-search-workspace
 pnpm install --frozen-lockfile
 # If .env.local does not already exist:
 cp .env.example .env.local
 pnpm dev
 ```
 
-This checkout includes a non-secret `.env.local` with the local defaults enabled. Preserve any existing configuration rather than overwriting it. The project uses a writable pnpm cache in `../.pnpm-store`.
+`.env.example` enables the local defaults; preserve any existing `.env.local` rather than overwriting it. The project's `.npmrc` points pnpm at a store in `../.pnpm-store`.
 
 Open **http://127.0.0.1:3000**. The dev script binds to loopback. Existing `fieldwork-demo-v1` browser data is retained. The initial records are synthetic examples; replace them with your own user-confirmed experience. Browser records belong to that browser origin; localhost and 127.0.0.1 have separate storage.
 
@@ -77,9 +106,9 @@ Choose **Applications → ⋯ → Prepare for this job**, or open Interview prac
 2. Choose start date, **one week**, **two weeks**, or an interview date, and 0.5–40 hours/week. Defaults are today, one week and 12 hours/week. The interview day is included; partial weeks are prorated. Specific dates may be up to one year from the start.
 3. Choose **Generate preparation plan**. One structured provider call combines requirements, analysis questions/tasks and referenced experience into questions with suggested answer outlines and prioritized study/practice activities. No browsing, grading, tools, tracing, automatic retry, download or provider fallback occurs. The serialized model input is limited to 60,000 characters without silent truncation; narrow an oversized target or shorten experience and re-analyze.
 4. Review questions/outlines, edit activities and estimates (5–120 minutes), change priority, deselect activities, and adjust timing. The schedule recalculates locally without another inference call. Activities are allocated in priority order, preserving input order for ties; indivisible activities that cannot fit any weekly bucket go to **Deferred**. Uncovered requirements are visible.
-5. Choose **Activate plan**. Interview practice uses its questions and source evidence; **Save notes and scores** explicitly persists written answers and self-review. Study plan and Preparation tasks share the same completion records, including job/type/status task filters. Writing an answer does not complete a rehearsal. Deferred work is kept outside schedule totals. Earlier approved analysis tasks remain separate from the new schedule.
+5. Choose **Activate plan**. Interview practice uses its questions and source evidence; written answers and self-review scores save automatically shortly after you stop typing. Study plan and Preparation tasks share the same completion records, including job/type/status task filters. Writing an answer does not complete a rehearsal. Deferred work is kept outside schedule totals. Earlier approved analysis tasks remain separate from the new schedule.
 
-Changing sources, target membership or timing never rewrites an active plan. Generate, review and activate a new version explicitly. Old versions retain their notes/scores/completion and are read-only; progress is not transferred automatically. Failed saves retain the review; activation retries do not duplicate versions or reset progress. Closing/reloading discards unactivated drafts and unsaved answer edits. A target deletion removes its versions/progress, while deleting an application retains preparation snapshots and marks affected membership as needing repair.
+Changing sources, target membership or timing never rewrites an active plan. Generate, review and activate a new version explicitly. Old versions retain their notes/scores/completion and are read-only; progress is not transferred automatically. Failed saves retain the review; activation retries do not duplicate versions or reset progress. Closing/reloading discards unactivated drafts and answer edits typed in the last moment before autosave. A target deletion removes its versions/progress, while deleting an application retains preparation snapshots and marks affected membership as needing repair.
 
 Browser preparation is stored additively under `fieldwork-preparation-v1`; prior `fieldwork-demo-v1` and `fieldwork-practice-*` keys are unchanged. Account storage requires **`supabase/migrations/004_preparation_targets.sql`**, applied after 001–003. It adds per-user target/version/progress tables, immutable plan records and transactional activation/progress RPCs. Apply this in your Supabase project before using signed-in preparation; no migration or Supabase is required for browser mode. No service-role key is used.
 
@@ -108,7 +137,7 @@ Use a model supporting structured output and function tools. OpenAI usage is bil
 ## Optional Supabase storage / hosted use
 
 1. Create a project at [Supabase Dashboard](https://supabase.com/dashboard/new). Use a personal Free organization for this development setup, name the project `job-search-workspace`, choose a nearby region, and generate/save the database password in your password manager. The app does not need that password. Leave the Data API enabled; this app uses the public schema with explicit grants and row-level security.
-2. In the project's SQL Editor, apply **each migration once, in order**: `001_workspace.sql`, `002_resume_import.sql`, `003_resume_without_citations.sql`, then **`004_preparation_targets.sql`** from `supabase/migrations/`. Run one file at a time and stop on an error. For an existing project, apply only migrations not already installed; do not rerun 001 or reset tables.
+2. In the project's SQL Editor, apply **each migration once, in order**: `001_workspace.sql`, `002_resume_import.sql`, `003_resume_without_citations.sql`, **`004_preparation_targets.sql`**, then **`005_inference_usage.sql`** from `supabase/migrations/`. Run one file at a time and stop on an error. For an existing project, apply only migrations not already installed; do not rerun 001 or reset tables.
 3. Under Authentication, enable email/password sign-up and leave email confirmation enabled. In URL Configuration, set **Site URL** to `http://127.0.0.1:3000` and add `http://127.0.0.1:3000/**` to allowed redirect URLs. If you intentionally use `localhost`, also add `http://localhost:3000/**`; browser records on that origin remain separate. Signup requests explicitly return to the origin where the app was opened. Use exact production URLs when deploying.
 4. Copy the **project URL** and **publishable key** (`sb_publishable_…`) from the project's Connect dialog into `.env.local`, preserving the existing model settings:
 
@@ -124,33 +153,36 @@ Use a model supporting structured output and function tools. OpenAI usage is bil
 
 Supabase here provides hosted authentication and database persistence. Keep `AI_PROVIDER=ollama` while Next runs on your laptop; the database does not run the model. A hosted Next server's `127.0.0.1` is that server, not your laptop; choose an available server-side provider such as OpenAI for a normal Vercel deployment. No cloud model hosting is provisioned here.
 
-If email confirmation returns to the wrong host, check Site URL, the redirect allowlist, and your browser origin. If account creation reports an email rate limit or delivery failure, check the project's Auth logs/email configuration and retry after the reported delay; the app does not automatically retry sign-ups. If sign-in succeeds but data reads fail, confirm all four SQL migrations finished successfully and the Data API exposes the public schema. Setup references: [Next.js project configuration](https://supabase.com/docs/guides/getting-started/quickstarts/nextjs), [Auth redirects](https://supabase.com/docs/guides/auth/redirect-urls).
+If email confirmation returns to the wrong host, check Site URL, the redirect allowlist, and your browser origin. If account creation reports an email rate limit or delivery failure, check the project's Auth logs/email configuration and retry after the reported delay; the app does not automatically retry sign-ups. If sign-in succeeds but data reads fail, confirm all five SQL migrations finished successfully and the Data API exposes the public schema. Setup references: [Next.js project configuration](https://supabase.com/docs/guides/getting-started/quickstarts/nextjs), [Auth redirects](https://supabase.com/docs/guides/auth/redirect-urls).
 
 Migration 003 removes the required resume excerpts from the import RPC while preserving existing records. Apply it after 002 if upgrading an existing Supabase workspace. Browser storage needs no migration.
 
 Migration 002 is additive for data: existing manual experience and analysis history remain valid. It adds optional provenance/import identifiers, retry uniqueness, a database capacity guard, provider metadata, a transactional `import_resume_experience` RPC, and a five-minute stale-analysis cutoff. The reservation RPC gains an optional fourth provider argument; existing three-argument callers still work. Back up your database and apply once through migrations; do not rerun migration 001 against an existing database.
 
-Only the publishable Supabase key and user token are used; no service-role key. Ownership comes from `auth.uid()`, with row-level security and authenticated function grants. Historical analyses keep their evidence snapshots. Authenticated analysis quota remains ten runs/hour across job deletion. Sign-in switches storage rather than automatically migrating browser records to an account.
+Only the publishable Supabase key and user token are used; no service-role key. Ownership comes from `auth.uid()`, with row-level security and authenticated function grants. Historical analyses keep their evidence snapshots. Authenticated analysis quota remains ten runs/hour across job deletion. Migration 005 adds hourly quotas for hosted resume extraction (10), job extraction (20) and plan generation (10); see [model calls](docs/architecture/model-calls.md). Sign-in switches storage rather than automatically migrating browser records to an account.
 
 ## Checks and evaluation
 
 ```sh
+pnpm format:check
 pnpm typecheck
-pnpm test
+pnpm test            # or pnpm test:coverage
 pnpm build
 ```
 
-Tests cover grounding contracts, both actual SDK transports with mocked HTTP, provider/access boundaries, PDF parsing policies, retry safety, database transactions/RLS/capacity, and existing workflow regression cases. See [VERIFICATION.md](VERIFICATION.md) for exactly what was executed and what remains unverified.
+`pnpm check` runs typecheck, tests and build. CI also runs `format:check` and coverage. Tests cover API routes, the shell and key views in jsdom, both SDK transports with mocked HTTP, provider and access boundaries, PDF parsing, retry safety, database transactions, RLS, capacity and quotas (PGlite), and the eval scorers. See [VERIFICATION.md](VERIFICATION.md) for the earlier execution record.
 
-Run the labeled **synthetic** extraction dataset against the selected provider:
+Labelled **synthetic** evals run against the configured provider, one call at a time:
 
 ```sh
-pnpm eval:resume
+pnpm eval:resume   # 8 resume cases: dates, multiple roles, projects, ownership, injection
+pnpm eval:job      # 8 job pages: noise, injection, sidebars, missing names, embellishment
+pnpm eval:prep     # 3 plan cases: single job, combined jobs, tight budget
 ```
 
-Eight cases cover missing dates, multiple roles, standalone projects, shared ownership, metrics, injection and skills-only content. Results under ignored `evals/results/` contain actual field matching/counts, invented-phrase flags, latency, failures and pending manual semantic review. Do not treat string matching as a complete measure of invented claims. No model quality result is claimed before successful runs and human review.
+Results go to the ignored `evals/results/`. Each record has scores, latency and tokens. [`evals/results.md`](evals/results.md) records the latest local Ollama run and the weaknesses it found. String matching is a heuristic, so review outputs before citing numbers.
 
-Paid comparisons require explicit opt-in:
+Billed comparisons with OpenAI require an explicit opt-in:
 
 ```sh
 # Select OpenAI in .env.local first. These commands incur API usage.
@@ -158,19 +190,26 @@ pnpm eval:resume --allow-paid
 pnpm eval:live --allow-paid
 ```
 
-The original JD comparison performs baseline + grounded runs across 20 cases (40 model runs). No paid comparison runs automatically in tests/CI.
+The JD comparison performs baseline and grounded runs across 20 cases, 40 model runs in total. No model eval runs in tests or CI.
+
+## Deploying
+
+Any Next.js host works with Supabase accounts and `AI_PROVIDER=openai`. A hosted server cannot reach a laptop's Ollama. Hosted use requires sign-in, and the local, account-less mode is refused outside loopback development. Set the Supabase URL and publishable key, `OPENAI_API_KEY` and `OPENAI_MODEL` as server environment variables, apply migrations 001–005, and add the deployed URL to Supabase's redirect allowlist. No demo deployment is maintained.
 
 ## Implementation map
 
-- `components/job-import.tsx`, `lib/job-page.ts`, `lib/job-extraction.ts`: URL/pasted text → source inspection → job extraction → editable confirmation.
-- `/api/jobs/fetch`, `/api/jobs/extract`: independent guarded page-fetch and model-extraction routes.
-- `components/resume-import.tsx`: input, inspection, review, confirmation; transient drafts.
-- `lib/pdf-text.ts`, `lib/pdf-browser.ts`: parsing limits, warnings and bundled worker.
-- `lib/resume.ts`: schemas, draft validation, duplicate checks and local import idempotency.
-- `lib/resume-extraction.ts`: native Ollama / OpenAI structured extraction.
-- `lib/ai-provider.ts`, `lib/agent.ts`: fixed provider transport, deadlines and bounded JD agent.
-- `/api/ai/status`, `/api/resume/extract`, `/api/analyze/local`, `/api/experience/import`: new routes.
-- `002_resume_import.sql`, `003_resume_without_citations.sql`: ownership-preserving persistence changes and citation-free imports.
+- `app/api/*/route.ts`: thin handlers that parse input, check access and quota, call `lib/`, and return JSON.
+- `lib/model-call.ts`: the one structured model-call path. Callers are `lib/resume-extraction.ts`, `lib/job-extraction.ts` and `lib/preparation-generation.ts`. Fit analysis is `lib/agent.ts` (Agents SDK).
+- `lib/domain.ts`, `lib/resume.ts`, `lib/preparation-plan.ts`: schemas, validation, local reducers and the deterministic scheduler.
+- `lib/job-page.ts`, `lib/pdf-text.ts`, `lib/pdf-browser.ts`: SSRF-safe page fetching and PDF text extraction.
+- `lib/store/`, `lib/api-client.ts`: browser and account storage behind one interface.
+- `components/workspace.tsx`: the shell. It uses `components/hooks/` (data, model status, practice notes, nav), `components/shell/`, `components/views/` and `components/modals/`.
+- `components/applications-view.tsx`: application list, fit analysis and plan approval.
+- `components/preparation-workspace.tsx` and `components/preparation/`: targets, plan generation, review, practice, schedule and tasks.
+- `components/job-import.tsx`, `components/resume-import.tsx`: the import wizards.
+- `supabase/migrations/001–005`: tables, RLS, transactional RPCs and quotas.
+- `evals/`, `scripts/evaluate*.ts`: labelled cases, scorers and the eval harness.
+- `lib/sample-practice.ts`: the sample general-practice content. Replace it with your own.
 
 PDF.js 5.6.205 is vendored as a browser-only package because registry access was unavailable during implementation. Its Apache-2.0 license, upstream attribution and update notes are in `vendor/pdfjs/`; the module and worker are served directly from versioned local assets to avoid rebundling PDF.js’s internal runtime, and fonts/CMaps/WASM are served from `public/pdf-assets`. No CDN code is loaded.
 

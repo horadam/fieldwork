@@ -29,14 +29,14 @@ Interview-prep workspace: resume import → experience bank → JD fit analysis 
 - Full gate (same as CI): `pnpm check` (typecheck + test + build)
 - Lint: none configured yet (`next lint` was removed in Next 16)
 - Migrations: SQL files in `supabase/migrations/`, applied in order by hand in the Supabase SQL editor. Never edit an applied migration; add `00N_*.sql`.
-- Evals: `pnpm eval:resume` (local Ollama); `pnpm eval:live --allow-paid` (OpenAI, billed — never run without being asked)
+- Evals: `pnpm eval:resume`, `pnpm eval:job`, `pnpm eval:prep` (local Ollama); `pnpm eval:live --allow-paid` (OpenAI, billed — never run without being asked). Record notable runs in `evals/results.md`
 
 ## Layout
 
 - `app/api/*/route.ts` — thin route handlers: parse with Zod, call `lib/`, return JSON
-- `lib/` — all logic. LLM calls live only in `lib/agent.ts` (JD analysis), `lib/resume-extraction.ts`, `lib/job-extraction.ts`, `lib/preparation-generation.ts`, all via `lib/ai-provider.ts`
+- `lib/` — all logic. LLM calls live only in `lib/agent.ts` (JD analysis, Agents SDK) and `lib/resume-extraction.ts`, `lib/job-extraction.ts`, `lib/preparation-generation.ts`, which all go through `lib/model-call.ts` (deadline, no retry, sanitized errors, usage). Provider config is `lib/ai-provider.ts`. Client storage goes through `lib/store/` and `lib/api-client.ts`
 - `lib/server.ts` — auth / local-access guard; every inference route must go through it
-- `components/` — client UI; `workspace.tsx` is the shell and views
+- `components/` — client UI; `workspace.tsx` is the shell, with `hooks/`, `shell/`, `views/`, `modals/`; preparation lives in `preparation-workspace.tsx` + `preparation/`
 - `tests/` — Vitest; HTTP and model providers are mocked, DB tests use PGlite
 - `evals/` — labeled cases; `scripts/evaluate*.ts` run them
 - `docs/architecture/` — flow docs; update when a data flow changes

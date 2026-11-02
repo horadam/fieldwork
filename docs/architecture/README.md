@@ -14,6 +14,8 @@ Read the first three documents together, then follow the feature you are studyin
 5. [Resume import](resume-import.md): browser parsing and user-confirmed experience.
 6. [Job import](job-import.md): safe page fetching and reviewed extraction.
 7. [Data model](data-model.md): physical tables versus logical JSON references.
+8. [Model calls](model-calls.md): one call path, usage recording, hosted quota.
+9. [Client data](client-data.md): the browser/account store behind the UI.
 
 ## Conventions
 

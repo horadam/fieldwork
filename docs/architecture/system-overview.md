@@ -70,8 +70,12 @@ uses a separate structured call followed by deterministic TypeScript scheduling.
 ## Implementation
 
 - [Page entry](../../app/page.tsx), [layout](../../app/layout.tsx),
-  [main workspace](../../components/workspace.tsx), and
-  [preparation workspace](../../components/preparation-workspace.tsx).
+  [workspace shell](../../components/workspace.tsx) with its
+  [views](../../components/views/), [shell parts](../../components/shell/),
+  [dialogs](../../components/modals/) and [hooks](../../components/hooks/);
+  [preparation workspace](../../components/preparation-workspace.tsx) and its
+  [parts](../../components/preparation/).
+- [Client data layer](client-data.md) and [model calls](model-calls.md).
 - [Access guards and errors](../../lib/server.ts),
   [provider configuration](../../lib/ai-provider.ts), and
   [non-secret readiness endpoint](../../app/api/ai/status/route.ts).
