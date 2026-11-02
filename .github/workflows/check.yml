@@ -13,7 +13,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
       - run: pnpm typecheck
-      - run: pnpm test
+      # Includes the eval scorers against canned outputs; no model is called.
+      - run: pnpm test:coverage
       - run: pnpm build
-  # Live evals run explicitly before releases; never expose paid API secrets to PR code.
+  # Model evals (pnpm eval:resume|job|prep, eval:live) run by hand before
+  # releases; never expose paid API secrets to PR code.

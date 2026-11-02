@@ -4,5 +4,14 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL(".", import.meta.url)) } },
   esbuild: { jsx: "automatic" },
   // UI tests opt into jsdom with a `@vitest-environment jsdom` docblock.
-  test: { environment: "node", include: ["tests/**/*.test.{ts,tsx}"] },
+  test: {
+    environment: "node",
+    include: ["tests/**/*.test.{ts,tsx}"],
+    // Report only; no threshold yet.
+    coverage: {
+      provider: "v8",
+      include: ["app/**", "components/**", "lib/**", "evals/score.ts"],
+      reporter: ["text-summary", "html"],
+    },
+  },
 });
