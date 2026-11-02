@@ -10,6 +10,9 @@ next-env.d.ts
 AGENTS.md
 pnpm-lock.yaml
 
+# Other sessions' worktrees live here and have their own formatting
+.claude/
+
 # Local configuration and generated evaluation records
 .env*
 evals/results/

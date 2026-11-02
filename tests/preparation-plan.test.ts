@@ -200,6 +200,22 @@ describe("validation and version lifecycle", () => {
     if (mode === "duration") plan.activities[0].minutes = 121;
     expect(() => validatePlan(plan, sources)).toThrow();
   });
+  it("rejects evidence the analysis did not cite, since the model never saw it", async () => {
+    const ws = workspace();
+    const uncited = {
+      id: "e2",
+      title: "Unrelated work",
+      body: "Organized a team offsite.",
+    };
+    ws.experience.push(uncited);
+    ws.runs[0].evidence_snapshot!.push(uncited);
+    const sources = await planSources(target, ws),
+      plan = output();
+    plan.questions[0].evidenceRefs[0].evidenceId = "e2";
+    expect(() => validatePlan(plan, sources)).toThrow(
+      "Unknown question evidence reference.",
+    );
+  });
   it("activates atomically and makes confirmation retries idempotent", async () => {
     const plan = version(await planSources(target, workspace()));
     const state = { ...emptyPreparation(), targets: [target] };

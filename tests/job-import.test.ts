@@ -246,6 +246,15 @@ describe("single-call job extraction", () => {
       { message: { content: JSON.stringify({ ...draft, jd: "" }) } },
       "No useful",
     ],
+    [
+      "over-long JD",
+      {
+        message: {
+          content: JSON.stringify({ ...draft, jd: "x".repeat(15001) }),
+        },
+      },
+      "longer than 15,000 characters",
+    ],
     ["truncated", { done_reason: "length" }, "output limit"],
   ])("rejects %s without retry", async (_name, value, message) => {
     const fetcher = vi.fn(async () => Response.json(value));

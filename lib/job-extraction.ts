@@ -7,14 +7,17 @@ import {
   providerError,
   type Provider,
 } from "./ai-provider";
+import { MAX_JD_CHARS } from "./domain";
 export const JOB_IMPORT_PROMPT_VERSION = "job-import-v1";
 export const jobPageInput = z.object({
   text: z.string().trim().min(80).max(30000),
 });
+// The model may return the whole 30k-character source; an over-long JD gets a
+// specific error below instead of a generic invalid-fields one.
 export const jobDraftSchema = z.object({
   company: z.string().max(160),
   role: z.string().max(160),
-  jd: z.string().max(15000),
+  jd: z.string().max(30000),
   warnings: z.array(z.string().max(300)).max(8),
 });
 export type JobDraft = z.infer<typeof jobDraftSchema>;
@@ -110,6 +113,12 @@ export async function extractJob(
       throw new AIError(
         "The model returned invalid job fields. Retry explicitly or enter the details manually.",
         "job_invalid_fields",
+      );
+    if (result.data.jd.trim().length > MAX_JD_CHARS)
+      throw new AIError(
+        `The job description is longer than ${MAX_JD_CHARS.toLocaleString("en-US")} characters. Trim the inspected text to this listing and extract again, or enter the details manually. Nothing was truncated.`,
+        "job_description_too_long",
+        422,
       );
     if (result.data.jd.trim().length < 20)
       throw new AIError(

@@ -73,6 +73,16 @@ it("rejects stale local inputs without a provider request", async () => {
   ).toBe(400);
   expect(mocks.generatePreparation).not.toHaveBeenCalled();
 });
+it("reports an unexpected generation failure as a server error, not stale sources", async () => {
+  vi.stubEnv("AI_PROVIDER", "ollama");
+  mocks.inferenceAccess.mockResolvedValue(null);
+  mocks.generatePreparation.mockRejectedValue(new TypeError("boom"));
+  const response = await generate(
+    req({ targetId: target.id, target, settings, workspace: workspace() }),
+  );
+  expect(response.status).toBe(500);
+  expect(JSON.stringify(await response.json())).not.toContain("outdated");
+});
 it("loads authenticated sources server-side and ignores forged browser snapshots", async () => {
   vi.stubEnv("AI_PROVIDER", "ollama");
   mocks.inferenceAccess.mockResolvedValue({ db: {} });

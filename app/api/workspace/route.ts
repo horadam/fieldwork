@@ -45,11 +45,11 @@ export async function POST(req: NextRequest) {
       .parse(await body(req));
     if (
       data.createId &&
-      (data.entity !== "job" || data.action !== "save" || data.id)
+      (data.entity === "task" || data.action !== "save" || data.id)
     )
       throw new HttpError(
         400,
-        "Creation ID is only valid for a new application.",
+        "Creation ID is only valid for a new application or experience entry.",
       );
     if (data.entity === "task") {
       if (!data.id || data.action !== "save")
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
           if (existing.error || !existing.data)
             throw new HttpError(
               409,
-              "Application could not be saved. Start a new import.",
+              "Record could not be saved. Close the form and try again.",
             );
           return NextResponse.json({ ok: true });
         }

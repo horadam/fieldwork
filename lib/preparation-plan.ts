@@ -213,6 +213,8 @@ async function fingerprint(value: string) {
     v.toString(16).padStart(2, "0"),
   ).join("");
 }
+// Missing, outdated or invalid analyses behind a target; callers map this to 400.
+export class SourceError extends Error {}
 export async function planSources(
   target: PreparationTarget,
   data: Workspace,
@@ -220,7 +222,7 @@ export async function planSources(
   targetSchema.parse(target);
   const problems = sourceProblems(target, data);
   if (problems.length)
-    throw new Error(problems.map((p) => p.message).join(" "));
+    throw new SourceError(problems.map((p) => p.message).join(" "));
   return Promise.all(
     target.jobIds.map(async (id) => {
       const job = data.jobs.find((j) => j.id === id)!,
@@ -235,11 +237,24 @@ export async function planSources(
         analysisId: run.id,
         jdSnapshot: job.jd,
         evidenceSnapshot: evidence,
-        analysis: validateAnalysis(run.output, evidence),
+        analysis: (() => {
+          try {
+            return validateAnalysis(run.output, evidence);
+          } catch {
+            throw new SourceError("A stored analysis failed validation.");
+          }
+        })(),
         jdFingerprint: await fingerprint(job.jd),
         evidenceFingerprint: await fingerprint(canonicalEvidence(evidence)),
       });
     }),
+  );
+}
+// The model only sees evidence its analysis cited, so plans may only reference that.
+export function citedEvidence(source: PlanSource | undefined) {
+  if (!source) return [];
+  return source.evidenceSnapshot.filter((e) =>
+    source.analysis.requirements.some((r) => r.evidenceIds.includes(e.id)),
   );
 }
 export function validatePlan(raw: unknown, sources: PlanSource[]): PlanOutput {
@@ -269,9 +284,7 @@ export function validatePlan(raw: unknown, sources: PlanSource[]): PlanOutput {
     for (const ref of q.evidenceRefs)
       if (
         !q.refs.some((r) => r.jobId === ref.jobId) ||
-        !jobs
-          .get(ref.jobId)
-          ?.evidenceSnapshot.some((e) => e.id === ref.evidenceId)
+        !citedEvidence(jobs.get(ref.jobId)).some((e) => e.id === ref.evidenceId)
       )
         throw new Error("Unknown question evidence reference.");
   }

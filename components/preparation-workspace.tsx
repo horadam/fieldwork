@@ -242,6 +242,12 @@ export function PreparationWorkspace(props: Props) {
     setSettings(value?.settings || defaultSettings());
     setDraft(null);
   }
+  // editTarget replaced the shared settings with the edited target's; put the
+  // selected target's settings back so the generate form stays accurate.
+  function cancelEdit() {
+    setEditor(false);
+    if (target) setSettings(target.settings);
+  }
   async function generate() {
     if (!target) return;
     await work(`Generating with ${props.provider}…`, async () => {
@@ -626,7 +632,7 @@ export function PreparationWorkspace(props: Props) {
                 type="button"
                 className="button secondary"
                 disabled={!!busy}
-                onClick={() => setEditor(false)}
+                onClick={cancelEdit}
               >
                 Cancel
               </button>
@@ -718,15 +724,12 @@ export function PreparationWorkspace(props: Props) {
                 </div>
               </div>
             )}
-            {plan &&
-              (outdated(plan, target, workspace) ||
-                JSON.stringify(settings) !== JSON.stringify(plan.settings)) && (
-                <p className="notice">
-                  This plan’s inputs have changed. Your current plan and
-                  progress remain available; generate and review a new version
-                  when ready.
-                </p>
-              )}
+            {plan && outdated(plan, target, workspace) && (
+              <p className="notice">
+                This plan’s inputs have changed. Your current plan and progress
+                remain available; generate and review a new version when ready.
+              </p>
+            )}
             {problems.map((problem) => (
               <div className="notice" key={problem.jobId}>
                 <p>{problem.message}</p>

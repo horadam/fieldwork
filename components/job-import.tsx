@@ -66,7 +66,6 @@ export function JobImport({
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const fields = new FormData(event.currentTarget);
-    console.log(fields);
     await execute("Saving application…", async () => {
       const parsed = jobInput.safeParse({
         company: fields.get("company"),
@@ -99,7 +98,7 @@ export function JobImport({
         sent.
       </p>
       {error && (
-        <p className="alert" role="alert">
+        <p className="notice error" role="alert">
           {error}
         </p>
       )}

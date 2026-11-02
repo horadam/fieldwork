@@ -79,6 +79,15 @@ it("accepts a committed confirmation retry without updating or overwriting the r
   expect(db.eq).toHaveBeenCalledWith("user_id", "owner");
   expect(db.insert).toHaveBeenCalledTimes(1);
 });
+it("accepts a retried manual experience save that reuses its creation ID", async () => {
+  const db = database(true);
+  const entry = { title: "Platform rewrite", body: "Led a Next.js migration." };
+  const response = await save(
+    req({ entity: "experience", action: "save", createId: id, value: entry }),
+  );
+  expect(response.status).toBe(200);
+  expect(db.insert).toHaveBeenCalledWith({ ...entry, id, user_id: "owner" });
+});
 it("does not accept a conflicting creation ID belonging to another user", async () => {
   database(true, false);
   expect(

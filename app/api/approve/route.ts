@@ -15,7 +15,14 @@ export async function POST(req: NextRequest) {
       .single();
     if (record.error || record.data.status !== "completed")
       throw new HttpError(404, "Completed analysis not found.");
-    validateAnalysis(record.data.output, record.data.evidence_snapshot);
+    try {
+      validateAnalysis(record.data.output, record.data.evidence_snapshot);
+    } catch {
+      throw new HttpError(
+        422,
+        "This analysis no longer passes validation. Re-run fit analysis before approving.",
+      );
+    }
     const approved = await db.rpc("approve_analysis", { p_run_id: runId });
     if (approved.error) throw approved.error;
     return NextResponse.json({ ok: true });

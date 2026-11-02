@@ -8,6 +8,7 @@ import {
   type Provider,
 } from "./ai-provider";
 import {
+  citedEvidence,
   planOutputSchema,
   validatePlan,
   settingsSchema,
@@ -37,9 +38,7 @@ export async function generatePreparation(
     ).capacity,
     sources: sources.map((s) => ({
       ...s,
-      evidenceSnapshot: s.evidenceSnapshot.filter((e) =>
-        s.analysis.requirements.some((r) => r.evidenceIds.includes(e.id)),
-      ),
+      evidenceSnapshot: citedEvidence(s),
       jdSnapshot: undefined,
       jdFingerprint: undefined,
       evidenceFingerprint: undefined,

@@ -56,6 +56,18 @@ describe("resume drafts and import contracts", () => {
     expect(out.drafts[0].dates).toBe("");
     expect(out.drafts[0].warnings.join()).toContain("Dates");
   });
+  it("keeps every model warning when the reminder cap is reached", () => {
+    const own = Array.from({ length: 8 }, (_, i) => `Model warning ${i + 1}`);
+    const out = validateExtraction(
+      { drafts: [{ ...draft, dates: "", warnings: own }], warnings: [] },
+      { text, pages: [] },
+    );
+    expect(out.drafts[0].warnings).toEqual(own);
+  });
+  it("does not silently shorten a long saved title", () => {
+    const long = { ...draft, organization: "A".repeat(150), role: "Engineer" };
+    expect(draftExperience(long).title).toBe(`${"A".repeat(150)} · Engineer`);
+  });
   it("rejects conflicting page text, malformed JSON shape, and oversize input", () => {
     expect(() =>
       resumeSource.parse({ text, pages: [{ page: 1, text: "unrelated" }] }),

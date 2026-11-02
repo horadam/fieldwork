@@ -34,8 +34,9 @@ export async function POST(req: NextRequest) {
     }
     const record = reservation.data;
     const started = Date.now();
+    let result;
     try {
-      const result = await analyze(
+      result = await analyze(
         record.jd_snapshot,
         record.evidence_snapshot as Experience[],
         config.model,
@@ -43,23 +44,12 @@ export async function POST(req: NextRequest) {
         config,
         req.signal,
       );
-      const saved = await db.rpc("finish_analysis", {
-        p_run_id: record.id,
-        p_output: result.output,
-        p_error: null,
-        p_duration: result.durationMs,
-        p_input: result.inputTokens,
-        p_output_tokens: result.outputTokens,
-      });
-      if (saved.error) throw saved.error;
-      return NextResponse.json({ ok: true, runId: record.id });
     } catch (error) {
       const diagnostic = providerError(config, error);
-      const message = diagnostic.message;
       const saved = await db.rpc("finish_analysis", {
         p_run_id: record.id,
         p_output: null,
-        p_error: message,
+        p_error: diagnostic.message,
         p_duration: Date.now() - started,
         p_input: 0,
         p_output_tokens: 0,
@@ -71,6 +61,21 @@ export async function POST(req: NextRequest) {
         );
       throw diagnostic;
     }
+    // A storage failure here is not an inference failure; report it as such.
+    const saved = await db.rpc("finish_analysis", {
+      p_run_id: record.id,
+      p_output: result.output,
+      p_error: null,
+      p_duration: result.durationMs,
+      p_input: result.inputTokens,
+      p_output_tokens: result.outputTokens,
+    });
+    if (saved.error)
+      throw new HttpError(
+        500,
+        "The analysis finished but could not be saved. Retry after five minutes, when the stale run expires.",
+      );
+    return NextResponse.json({ ok: true, runId: record.id });
   } catch (e) {
     return failure(e);
   }

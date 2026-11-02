@@ -8,6 +8,8 @@ export const stageSchema = z.enum([
   "Offer",
   "Closed",
 ]);
+// Matches the applications.jd check constraint in 001_workspace.sql.
+export const MAX_JD_CHARS = 15000;
 export const experienceInput = z.object({
   title: z.string().trim().min(1).max(160),
   body: z.string().trim().min(10).max(5000),
@@ -15,7 +17,7 @@ export const experienceInput = z.object({
 export const jobInput = z.object({
   company: z.string().trim().min(1).max(160),
   role: z.string().trim().min(1).max(160),
-  jd: z.string().trim().min(20).max(15000),
+  jd: z.string().trim().min(20).max(MAX_JD_CHARS),
   stage: stageSchema,
   notes: z.string().max(4000),
 });

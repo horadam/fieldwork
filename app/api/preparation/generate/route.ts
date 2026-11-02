@@ -4,6 +4,7 @@ import { body, failure, inferenceAccess, HttpError } from "@/lib/server";
 import { providerConfig } from "@/lib/ai-provider";
 import {
   planSources,
+  SourceError,
   targetSchema,
   settingsSchema,
 } from "@/lib/preparation-plan";
@@ -51,10 +52,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     return failure(
-      error instanceof Error &&
-        !(error instanceof HttpError) &&
-        !("issues" in error) &&
-        !("code" in error)
+      error instanceof SourceError
         ? new HttpError(
             400,
             "Preparation sources are missing or outdated. Run a current real analysis for every selected job.",

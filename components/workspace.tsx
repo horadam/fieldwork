@@ -18,6 +18,7 @@ import { seed } from "@/lib/seed";
 import { interviewQuestions, weeks } from "@/lib/preparation";
 import { PreparationWorkspace } from "./preparation-workspace";
 import { ApplicationsView } from "./applications-view";
+import { Dialog } from "./modals/dialog";
 import { supabaseConfig } from "@/lib/supabase-config";
 
 const empty: Data = { jobs: [], experience: [], runs: [], tasks: [] };
@@ -41,79 +42,17 @@ const tabIcons = [
 const storageKey = "fieldwork-demo-v1";
 const navKey = "fieldwork-nav-collapsed";
 type Modal =
-  | { type: "job"; value?: Job }
-  | { type: "experience"; value?: Experience }
+  // createId is minted when the form opens, so a retried save reuses it.
+  | { type: "job"; value?: Job; createId?: string }
+  | { type: "experience"; value?: Experience; createId?: string }
   | { type: "job-import" }
   | { type: "import" }
   | { type: "auth" }
   | { type: "delete"; entity: "job" | "experience"; id: string };
 
-function Dialog({
-  title,
-  children,
-  close,
-}: {
-  title: string;
-  children: React.ReactNode;
-  close: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const root = ref.current!;
-    const focusable = () =>
-      Array.from(
-        root.querySelectorAll<HTMLElement>(
-          "button,input,textarea,select,a[href]",
-        ),
-      ).filter((e) => !e.hasAttribute("disabled"));
-    focusable()[0]?.focus();
-    const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-      if (event.key === "Tab") {
-        const list = focusable();
-        const first = list[0];
-        const last = list[list.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last?.focus();
-        }
-        if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-    root.addEventListener("keydown", key);
-    return () => {
-      root.removeEventListener("keydown", key);
-      previous?.focus();
-    };
-  }, [close]);
-  return (
-    <div className="dialog-shade">
-      <div
-        className="dialog"
-        ref={ref}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="dialog-title"
-      >
-        <div className="dialog-top">
-          <h2 id="dialog-title">{title}</h2>
-          <button className="close" aria-label="Close dialog" onClick={close}>
-            ×
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 export default function Workspace() {
   const [aiStatus, setAiStatus] = useState<{
-    provider: string;
+    provider: "ollama" | "openai";
     model: string;
     ready: boolean;
     message: string;
@@ -129,6 +68,8 @@ export default function Workspace() {
   const [email, setEmail] = useState("");
   const [modal, setModal] = useState<Modal | null>(null);
   const [error, setError] = useState("");
+  // Non-error outcomes, such as "check your email" after sign-up.
+  const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [search, setSearch] = useState("");
@@ -333,6 +274,7 @@ export default function Workspace() {
           entity: current.type,
           action: "save",
           id: current.value?.id,
+          createId: current.value ? undefined : current.createId,
           value,
         });
         await refresh();
@@ -343,7 +285,7 @@ export default function Workspace() {
           data.experience.length >= 50
         )
           throw new Error("Experience bank is limited to 50 entries.");
-        const id = current.value?.id || crypto.randomUUID();
+        const id = current.value?.id || current.createId || crypto.randomUUID();
         setData((old) =>
           current.type === "job"
             ? {
@@ -455,6 +397,10 @@ export default function Workspace() {
         }
         return;
       }
+      if (!simulated && !aiStatus)
+        throw new Error(
+          "Model status is unknown. Refresh model status and try again.",
+        );
       const run: Run = {
         id: crypto.randomUUID(),
         application_id: job.id,
@@ -463,10 +409,8 @@ export default function Workspace() {
         error: null,
         created_at: new Date().toISOString(),
         prompt_version: simulated ? "offline-preview" : "grounded-v3",
-        provider: simulated
-          ? "simulated"
-          : (aiStatus?.provider as "ollama" | "openai"),
-        model: simulated ? "none" : aiStatus?.model || "unknown",
+        provider: simulated ? "simulated" : aiStatus!.provider,
+        model: simulated ? "none" : aiStatus!.model,
         duration_ms: null,
         jd_snapshot: job.jd,
         evidence_snapshot: structuredClone(data.experience),
@@ -558,6 +502,7 @@ export default function Workspace() {
   ) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    setInfo("");
     await act(async () => {
       if (!client)
         throw new Error(
@@ -575,7 +520,7 @@ export default function Workspace() {
         : await client.auth.signInWithPassword(credentials);
       if (response.error) throw response.error;
       if (!response.data.session) {
-        setError("Check your email to confirm your account, then sign in.");
+        setInfo("Check your email to confirm your account, then sign in.");
         return;
       }
       setModal(null);
@@ -770,7 +715,9 @@ export default function Workspace() {
               </button>
               <button
                 className="button"
-                onClick={() => setModal({ type: "job" })}
+                onClick={() =>
+                  setModal({ type: "job", createId: crypto.randomUUID() })
+                }
               >
                 + Add application
               </button>
@@ -787,7 +734,12 @@ export default function Workspace() {
               </button>
               <button
                 className="button"
-                onClick={() => setModal({ type: "experience" })}
+                onClick={() =>
+                  setModal({
+                    type: "experience",
+                    createId: crypto.randomUUID(),
+                  })
+                }
               >
                 + Add experience
               </button>
@@ -938,7 +890,9 @@ export default function Workspace() {
               setModal({ type: "delete", entity: "job", id: job.id })
             }
             onApprove={approve}
-            onAdd={() => setModal({ type: "job" })}
+            onAdd={() =>
+              setModal({ type: "job", createId: crypto.randomUUID() })
+            }
           />
         )}
 
@@ -1304,6 +1258,11 @@ export default function Workspace() {
             />
           ) : modal.type === "auth" ? (
             <>
+              {info && (
+                <div role="status" className="notice">
+                  {info}
+                </div>
+              )}
               <p className="tiny muted">
                 {client
                   ? "Sign in or create an account. Email confirmation may be required."

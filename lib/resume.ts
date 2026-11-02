@@ -80,10 +80,9 @@ const normalize = (s: string) =>
     .replace(/[^\p{L}\p{N}]/gu, "");
 export function draftExperience(draft: Draft) {
   return {
-    title: [draft.organization, draft.role]
-      .filter(Boolean)
-      .join(" · ")
-      .slice(0, 160),
+    // Not truncated: a title over 160 characters is shown for editing and
+    // blocked at save with a field error.
+    title: [draft.organization, draft.role].filter(Boolean).join(" · "),
     body: [draft.dates, ...draft.accomplishments].filter(Boolean).join("\n"),
   };
 }
@@ -145,15 +144,17 @@ export function validateExtraction(raw: unknown, input: ResumeSource) {
   }
   const output = parsed.data;
   for (const draft of output.drafts)
+    // Model warnings come first so the 8-item cap only ever drops our own
+    // reminders, which the review step also states on the page.
     draft.warnings = [
       ...new Set([
-        "Review roles, dates, accomplishments, metrics, and ownership before confirming. These are AI-generated drafts.",
+        ...draft.warnings,
         ...(!draft.dates
           ? [
               "Dates were not supplied; leave empty unless you can confirm them.",
             ]
           : []),
-        ...draft.warnings,
+        "Review roles, dates, accomplishments, metrics, and ownership before confirming. These are AI-generated drafts.",
       ]),
     ].slice(0, 8);
   return output;
