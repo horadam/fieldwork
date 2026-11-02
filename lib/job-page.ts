@@ -1,9 +1,9 @@
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { request } from "node:https";
+import { MAX_JOB_SOURCE_CHARS } from "./domain";
 
 export const MAX_PAGE_BYTES = 2 * 1024 * 1024;
-export const MAX_JOB_SOURCE = 30000;
 export class JobPageError extends Error {
   constructor(
     message: string,
@@ -549,7 +549,7 @@ export async function fetchJobPage(
       throw new JobPageError(
         "Not enough readable job text was found. This page may need JavaScript or login. Paste the JD text instead.",
       );
-    if (result.text.length > MAX_JOB_SOURCE)
+    if (result.text.length > MAX_JOB_SOURCE_CHARS)
       throw new JobPageError(
         "This page contains too much text. Paste just the job description (up to 30,000 characters) instead.",
         413,

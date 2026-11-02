@@ -18,13 +18,9 @@ const results = [];
 for (const variant of ["baseline", "grounded"] as const)
   for (const c of cases) {
     try {
-      const run = await analyze(
-        c.jd,
-        c.evidence,
-        process.env.OPENAI_MODEL,
+      const run = await analyze(c.jd, c.evidence, providerConfig(), {
         variant,
-        providerConfig(),
-      );
+      });
       const exactStatusMatch =
         run.output.requirements.length === 1 &&
         run.output.requirements[0].status === c.expected;

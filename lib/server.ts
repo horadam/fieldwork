@@ -155,3 +155,27 @@ export async function inferenceAccess(req: NextRequest, localOnly = false) {
     );
   return null;
 }
+
+export type InferenceKind =
+  | "resume_extraction"
+  | "job_extraction"
+  | "preparation_generation";
+// Hosted (signed-in) calls spend the per-hour quota in 005_inference_usage.sql;
+// local development calls (no account) are not metered.
+export async function reserveInference(
+  access: Awaited<ReturnType<typeof inferenceAccess>>,
+  kind: InferenceKind,
+) {
+  if (!access) return;
+  const { error } = await access.db.rpc("reserve_inference", { p_kind: kind });
+  if (!error) return;
+  if (error.message.includes("Hourly"))
+    throw new HttpError(
+      429,
+      "Hourly limit for this action reached. Try later.",
+    );
+  throw new HttpError(
+    503,
+    "Could not check your usage quota. Apply the latest database migration and retry.",
+  );
+}

@@ -235,11 +235,11 @@ describe("single-call job extraction", () => {
     expect(payload.messages[0].content).toContain("untrusted");
   });
   it.each([
-    ["bad JSON", { message: { content: "bad" } }, "invalid job JSON"],
+    ["bad JSON", { message: { content: "bad" } }, "invalid JSON"],
     [
       "invalid fields",
       { message: { content: JSON.stringify({ ...draft, company: 2 }) } },
-      "invalid job fields",
+      "invalid fields",
     ],
     [
       "no JD",

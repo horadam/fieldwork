@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticated, body, failure, HttpError } from "@/lib/server";
-import { analyze, PROMPT_VERSION } from "@/lib/agent";
-import { providerConfig, providerError } from "@/lib/ai-provider";
+import { analyze, ANALYSIS_PROMPT_VERSION } from "@/lib/agent";
+import { AIError, providerConfig, providerError } from "@/lib/ai-provider";
 import type { Experience } from "@/lib/domain";
 export const runtime = "nodejs";
 export const maxDuration = 200;
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const reservation = await db.rpc("start_analysis", {
       p_application_id: applicationId,
       p_model: config.model,
-      p_prompt_version: PROMPT_VERSION,
+      p_prompt_version: ANALYSIS_PROMPT_VERSION,
       p_provider: config.provider,
     });
     if (reservation.error) {
@@ -39,20 +39,20 @@ export async function POST(req: NextRequest) {
       result = await analyze(
         record.jd_snapshot,
         record.evidence_snapshot as Experience[],
-        config.model,
-        "grounded",
         config,
-        req.signal,
+        { signal: req.signal },
       );
     } catch (error) {
       const diagnostic = providerError(config, error);
+      // Usage is known when the model answered but the output was rejected.
+      const usage = error instanceof AIError ? error.usage : undefined;
       const saved = await db.rpc("finish_analysis", {
         p_run_id: record.id,
         p_output: null,
         p_error: diagnostic.message,
-        p_duration: Date.now() - started,
-        p_input: 0,
-        p_output_tokens: 0,
+        p_duration: usage?.durationMs ?? Date.now() - started,
+        p_input: usage?.inputTokens ?? 0,
+        p_output_tokens: usage?.outputTokens ?? 0,
       });
       if (saved.error)
         throw new HttpError(
@@ -66,9 +66,9 @@ export async function POST(req: NextRequest) {
       p_run_id: record.id,
       p_output: result.output,
       p_error: null,
-      p_duration: result.durationMs,
-      p_input: result.inputTokens,
-      p_output_tokens: result.outputTokens,
+      p_duration: result.metadata.durationMs,
+      p_input: result.metadata.inputTokens,
+      p_output_tokens: result.metadata.outputTokens,
     });
     if (saved.error)
       throw new HttpError(

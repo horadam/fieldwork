@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticated, body, failure, HttpError } from "@/lib/server";
 import { validateAnalysis } from "@/lib/domain";
+export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   try {
     const { db } = await authenticated(req);

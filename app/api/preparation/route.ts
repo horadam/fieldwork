@@ -12,6 +12,7 @@ import {
   validateProgress,
   planSources,
 } from "@/lib/preparation-plan";
+export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   try {
     const { db } = await authenticated(req);

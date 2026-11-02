@@ -60,6 +60,18 @@ it("accepts bounded local source snapshots with a current real analysis", async 
   expect(response.headers.get("cache-control")).toBe("no-store");
   expect(mocks.generatePreparation).toHaveBeenCalledTimes(1);
 });
+it("rejects malformed local source snapshots before any provider request", async () => {
+  mocks.inferenceAccess.mockResolvedValue(null);
+  const data = { ...workspace(), runs: ["not a run"] };
+  expect(
+    (
+      await generate(
+        req({ targetId: target.id, target, settings, workspace: data }),
+      )
+    ).status,
+  ).toBe(400);
+  expect(mocks.generatePreparation).not.toHaveBeenCalled();
+});
 it("rejects stale local inputs without a provider request", async () => {
   mocks.inferenceAccess.mockResolvedValue(null);
   const data = workspace();
@@ -85,7 +97,8 @@ it("reports an unexpected generation failure as a server error, not stale source
 });
 it("loads authenticated sources server-side and ignores forged browser snapshots", async () => {
   vi.stubEnv("AI_PROVIDER", "ollama");
-  mocks.inferenceAccess.mockResolvedValue({ db: {} });
+  const rpc = vi.fn(async () => ({ data: null, error: null }));
+  mocks.inferenceAccess.mockResolvedValue({ db: { rpc } });
   mocks.ownedTarget.mockResolvedValue(target);
   mocks.loadSources.mockResolvedValue(workspace());
   mocks.generatePreparation.mockResolvedValue({ output: output(), metadata });
@@ -98,9 +111,27 @@ it("loads authenticated sources server-side and ignores forged browser snapshots
     }),
   );
   expect(response.status).toBe(200);
+  expect(rpc).toHaveBeenCalledWith("reserve_inference", {
+    p_kind: "preparation_generation",
+  });
   expect(mocks.loadSources).toHaveBeenCalled();
   const sources = mocks.generatePreparation.mock.calls[0][0];
   expect(sources[0].company).toBe("Example");
+});
+it("refuses a hosted generation over the hourly quota without a model call", async () => {
+  mocks.inferenceAccess.mockResolvedValue({
+    db: {
+      rpc: async () => ({
+        data: null,
+        error: { message: "Hourly inference limit reached" },
+      }),
+    },
+  });
+  mocks.ownedTarget.mockResolvedValue(target);
+  mocks.loadSources.mockResolvedValue(workspace());
+  const response = await generate(req({ targetId: target.id, settings }));
+  expect(response.status).toBe(429);
+  expect(mocks.generatePreparation).not.toHaveBeenCalled();
 });
 it("rejects invalid settings before loading sources or making a provider call", async () => {
   mocks.inferenceAccess.mockResolvedValue(null);

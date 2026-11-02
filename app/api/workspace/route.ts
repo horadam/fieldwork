@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authenticated, body, failure, HttpError } from "@/lib/server";
 import { experienceInput, jobInput } from "@/lib/domain";
 import { z } from "zod";
+export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   try {
     const { db } = await authenticated(req);

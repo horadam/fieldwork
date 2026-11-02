@@ -130,6 +130,9 @@ export const versionSchema = z.object({
     model: text.max(100),
     promptVersion: text.max(100),
     durationMs: z.number().nonnegative(),
+    // Optional: versions saved before usage was recorded lack them.
+    inputTokens: z.number().int().nonnegative().optional(),
+    outputTokens: z.number().int().nonnegative().optional(),
   }),
 });
 export type PreparationPlanVersion = z.infer<typeof versionSchema>;

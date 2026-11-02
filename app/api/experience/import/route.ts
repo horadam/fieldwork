@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticated, body, failure, HttpError } from "@/lib/server";
 import { importSchema } from "@/lib/resume";
+export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   try {
     const { db } = await authenticated(req);

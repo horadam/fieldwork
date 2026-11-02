@@ -408,7 +408,8 @@ export default function Workspace() {
         output: null,
         error: null,
         created_at: new Date().toISOString(),
-        prompt_version: simulated ? "offline-preview" : "grounded-v3",
+        // The real prompt version arrives with the result.
+        prompt_version: simulated ? "offline-preview" : "pending",
         provider: simulated ? "simulated" : aiStatus!.provider,
         model: simulated ? "none" : aiStatus!.model,
         duration_ms: null,

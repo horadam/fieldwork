@@ -10,7 +10,14 @@ export type Provider = {
   deadlineMs: number;
 };
 export const OLLAMA_URL = "http://127.0.0.1:11434";
+export type CallUsage = {
+  durationMs: number;
+  inputTokens: number;
+  outputTokens: number;
+};
 export class AIError extends Error {
+  // Set on failures after a model call started, so callers can record cost.
+  usage?: CallUsage;
   constructor(
     message: string,
     public code = "ai_configuration",

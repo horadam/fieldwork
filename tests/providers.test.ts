@@ -225,7 +225,7 @@ it.each([
   {
     status: 400,
     code: "ollama_request_rejected",
-    message: "structured extraction request",
+    message: "structured request",
   },
   { status: 503, code: "ollama_busy", message: "busy" },
   { status: 500, code: "ollama_server_error", message: "HTTP 500" },
@@ -246,13 +246,13 @@ it.each([
   },
 );
 it.each([
-  { content: "not JSON", code: "invalid_model_json" },
+  { content: "not JSON", code: "resume_invalid_json" },
   {
     content: JSON.stringify({
       drafts: [{ ...output.drafts[0], dates: null }],
       warnings: [],
     }),
-    code: "invalid_draft_schema",
+    code: "resume_invalid_drafts",
   },
 ])("reports output rejection stage $code", async ({ content, code }) => {
   vi.stubGlobal(
@@ -281,7 +281,7 @@ it("distinguishes token exhaustion from a timeout", async () => {
   const error = await extractResume({ text, pages: [] }, config).catch(
     (e) => e,
   );
-  expect(error.code).toBe("extraction_truncated");
+  expect(error.code).toBe("resume_truncated");
   expect(error.message).toContain("output limit");
 });
 it("reports connection errors without exposing provider diagnostics", async () => {
@@ -325,7 +325,7 @@ it("extracts roles without generating citations or requiring source passages", a
   });
   vi.stubGlobal("fetch", fetcher);
   const result = await extractResume({ text, pages: [] }, config);
-  expect(result.drafts).toHaveLength(1);
-  expect(result.drafts[0]).not.toHaveProperty("passages");
+  expect(result.output.drafts).toHaveLength(1);
+  expect(result.output.drafts[0]).not.toHaveProperty("passages");
   expect(fetcher).toHaveBeenCalledTimes(1);
 });

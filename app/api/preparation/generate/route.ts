@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { body, failure, inferenceAccess, HttpError } from "@/lib/server";
+import {
+  body,
+  failure,
+  inferenceAccess,
+  HttpError,
+  reserveInference,
+} from "@/lib/server";
 import { providerConfig } from "@/lib/ai-provider";
 import {
   planSources,
@@ -10,7 +16,42 @@ import {
 } from "@/lib/preparation-plan";
 import { loadSources, ownedTarget } from "@/lib/preparation-server";
 import { generatePreparation } from "@/lib/preparation-generation";
-import type { Workspace } from "@/lib/domain";
+import {
+  experienceInput,
+  jobInput,
+  MAX_JD_CHARS,
+  type Workspace,
+} from "@/lib/domain";
+// Browser-held sources for local mode. Shapes are checked here; analyses are
+// re-validated against their evidence by planSources before any model call.
+const localSources = z.object({
+  jobs: z.array(jobInput.extend({ id: z.string().min(1).max(100) })).max(200),
+  experience: z
+    .array(
+      z.looseObject({
+        ...experienceInput.shape,
+        id: z.string().min(1).max(100),
+      }),
+    )
+    .max(50),
+  runs: z
+    .array(
+      z.looseObject({
+        id: z.string().min(1).max(100),
+        application_id: z.string().min(1).max(100),
+        status: z.enum(["pending", "running", "completed", "failed"]),
+        output: z.unknown(),
+        created_at: z.string().max(40),
+        jd_snapshot: z.string().max(MAX_JD_CHARS).optional(),
+        evidence_snapshot: z
+          .array(z.looseObject({ id: z.string() }))
+          .max(50)
+          .optional(),
+      }),
+    )
+    .max(500),
+  tasks: z.array(z.unknown()).max(2000).default([]),
+});
 export const runtime = "nodejs";
 export const maxDuration = 200;
 export async function POST(req: NextRequest) {
@@ -29,17 +70,16 @@ export async function POST(req: NextRequest) {
       : targetSchema.parse(input.target);
     if (target.id !== input.targetId)
       throw new HttpError(400, "Target mismatch.");
-    const workspace = access
-      ? await loadSources(access.db, target)
-      : (input.workspace as Workspace);
-    if (
-      !workspace ||
-      !Array.isArray(workspace.jobs) ||
-      !Array.isArray(workspace.experience) ||
-      !Array.isArray(workspace.runs)
-    )
-      throw new HttpError(400, "Source workspace required.");
+    let workspace: Workspace;
+    if (access) workspace = await loadSources(access.db, target);
+    else {
+      const parsed = localSources.safeParse(input.workspace);
+      if (!parsed.success)
+        throw new HttpError(400, "Source workspace required.");
+      workspace = parsed.data as Workspace;
+    }
     const sources = await planSources(target, workspace);
+    await reserveInference(access, "preparation_generation");
     const result = await generatePreparation(
       sources,
       input.settings,

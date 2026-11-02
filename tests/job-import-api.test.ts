@@ -119,6 +119,19 @@ it("does not allow creation IDs to change the existing edit or delete behavior",
   ).toBe(400);
   expect(db.insert).not.toHaveBeenCalled();
 });
+it("spends the hosted extraction quota before calling the model", async () => {
+  const rpc = vi.fn(async () => ({
+    data: null,
+    error: { message: "Hourly inference limit reached" },
+  }));
+  mocks.inferenceAccess.mockResolvedValue({ db: { rpc } });
+  const response = await extract(req({ text: "x".repeat(200) }));
+  expect(response.status).toBe(429);
+  expect(rpc).toHaveBeenCalledWith("reserve_inference", {
+    p_kind: "job_extraction",
+  });
+  expect(mocks.extractJob).not.toHaveBeenCalled();
+});
 it("guards page fetching and extraction before processing input", async () => {
   mocks.inferenceAccess.mockRejectedValue(new HttpError(403, "Access denied"));
   expect((await fetchPage(req({ url: "https://example.com" }))).status).toBe(

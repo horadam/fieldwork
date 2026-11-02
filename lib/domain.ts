@@ -10,6 +10,8 @@ export const stageSchema = z.enum([
 ]);
 // Matches the applications.jd check constraint in 001_workspace.sql.
 export const MAX_JD_CHARS = 15000;
+// Inspected job-page text sent to extraction; longer pages are rejected, not cut.
+export const MAX_JOB_SOURCE_CHARS = 30000;
 export const experienceInput = z.object({
   title: z.string().trim().min(1).max(160),
   body: z.string().trim().min(10).max(5000),

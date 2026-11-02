@@ -11,6 +11,7 @@ vi.mock("../lib/agent", async (original) => ({
 }));
 import { POST as analyze } from "../app/api/analyze/route";
 import { POST as approve } from "../app/api/approve/route";
+import { AIError } from "../lib/ai-provider";
 const id = "4b8954ca-4e61-4a04-838e-f145ba73422b";
 const evidence = [{ id: "e1", title: "React", body: "Built React apps." }];
 const output = {
@@ -60,9 +61,7 @@ it("reports a failed result save as a storage error, not an inference failure", 
   const rpc = database({ code: "XX000" });
   mocks.analyze.mockResolvedValue({
     output,
-    durationMs: 10,
-    inputTokens: 1,
-    outputTokens: 1,
+    metadata: { durationMs: 10, inputTokens: 1, outputTokens: 1 },
   });
   const response = await analyze(req({ applicationId: id }));
   expect(response.status).toBe(500);
@@ -80,6 +79,20 @@ it("records a provider failure on the run and returns the sanitized diagnostic",
   expect(response.status).toBeGreaterThanOrEqual(500);
   const finish = rpc.mock.calls.find(([n]) => n === "finish_analysis");
   expect(finish?.[1]).toMatchObject({ p_output: null });
+});
+it("records the model's token usage when its output is rejected", async () => {
+  vi.stubEnv("AI_PROVIDER", "ollama");
+  const rpc = database();
+  const rejected = new AIError("invalid", "analysis_invalid_output");
+  rejected.usage = { durationMs: 1200, inputTokens: 300, outputTokens: 90 };
+  mocks.analyze.mockRejectedValue(rejected);
+  await analyze(req({ applicationId: id }));
+  const finish = rpc.mock.calls.find(([n]) => n === "finish_analysis");
+  expect(finish?.[1]).toMatchObject({
+    p_duration: 1200,
+    p_input: 300,
+    p_output_tokens: 90,
+  });
 });
 it("rejects approval of a stored run that fails validation with 422", async () => {
   const single = vi.fn(async () => ({

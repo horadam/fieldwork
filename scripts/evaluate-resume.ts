@@ -12,7 +12,8 @@ const norm = (v: string) => v.toLowerCase().replace(/\s+/g, " ").trim();
 for (const c of resumeCases) {
   const started = Date.now();
   try {
-    const result = await extractResume({ text: c.text, pages: [] }, config);
+    const call = await extractResume({ text: c.text, pages: [] }, config);
+    const result = { ...call.output, metadata: call.metadata };
     const remaining = [...result.drafts];
     let correctFields = 0;
     for (const expected of c.expected) {

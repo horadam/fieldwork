@@ -70,12 +70,12 @@ describe("real SDK with mocked HTTP transport (no provider calls)", () => {
         });
       }),
     );
-    const result = await analyze(job.jd, evidence, "qwen3:8b", "grounded", {
+    const result = await analyze(job.jd, evidence, {
       provider: "ollama",
       model: "qwen3:8b",
       deadlineMs: 180000,
     });
-    expect(result.toolCalls).toBe(2);
+    expect(result.metadata.toolCalls).toBe(2);
     expect(result.output.tasks.length).toBeGreaterThan(0);
     expect(requests).toHaveLength(2);
     expect(
@@ -102,7 +102,7 @@ describe("real SDK with mocked HTTP transport (no provider calls)", () => {
     );
     vi.stubGlobal("fetch", fetcher);
     await expect(
-      analyze(job.jd, evidence, "test", "grounded", {
+      analyze(job.jd, evidence, {
         provider: "openai",
         model: "test",
         deadlineMs: 45000,
@@ -144,7 +144,7 @@ describe("real SDK with mocked HTTP transport (no provider calls)", () => {
       },
       { provider: "openai", model: "test", deadlineMs: 45000 },
     );
-    expect(result.drafts).toHaveLength(0);
+    expect(result.output.drafts).toHaveLength(0);
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(fetcher.mock.calls[0][0]).toBe(
       "https://api.openai.com/v1/chat/completions",
@@ -181,13 +181,13 @@ it("analyzes a local response without tool calls using sources supplied in the f
     });
   });
   vi.stubGlobal("fetch", fetcher);
-  const result = await analyze(job.jd, evidence, "qwen3:8b", "grounded", {
+  const result = await analyze(job.jd, evidence, {
     provider: "ollama",
     model: "qwen3:8b",
     deadlineMs: 180000,
   });
   expect(result.output.requirements[0].evidenceIds).toEqual(["e1"]);
-  expect(result.toolCalls).toBe(0);
+  expect(result.metadata.toolCalls).toBe(0);
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 it("rejects invented evidence IDs with a validation-specific error and no retry", async () => {
@@ -211,7 +211,7 @@ it("rejects invented evidence IDs with a validation-specific error and no retry"
     }),
   );
   vi.stubGlobal("fetch", fetcher);
-  const error = await analyze(job.jd, evidence, "qwen3:8b", "grounded", {
+  const error = await analyze(job.jd, evidence, {
     provider: "ollama",
     model: "qwen3:8b",
     deadlineMs: 180000,
@@ -244,7 +244,7 @@ it("reports SDK JSON parse failures without exposing model text", async () => {
       }),
     ),
   );
-  const error = await analyze(job.jd, evidence, "qwen3:8b", "grounded", {
+  const error = await analyze(job.jd, evidence, {
     provider: "ollama",
     model: "qwen3:8b",
     deadlineMs: 180000,

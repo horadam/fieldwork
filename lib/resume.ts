@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { experienceInput, type Experience } from "./domain";
-export const RESUME_PROMPT_VERSION = "resume-v3";
 export const MAX_RESUME_CHARS = 20000;
 const page = z.object({
   page: z.number().int().min(1).max(10),
@@ -124,7 +123,7 @@ export function likelyDuplicate(
 export class ResumeOutputError extends Error {
   constructor(
     message: string,
-    public code: "invalid_draft_schema",
+    public code: "resume_invalid_drafts",
   ) {
     super(message);
   }
@@ -139,7 +138,7 @@ export function validateExtraction(raw: unknown, input: ResumeSource) {
     ].slice(0, 4);
     throw new ResumeOutputError(
       `The model returned invalid draft fields (${paths.join(", ") || "root"}). Missing text fields must be empty strings. Try generating drafts again or use a shorter source.`,
-      "invalid_draft_schema",
+      "resume_invalid_drafts",
     );
   }
   const output = parsed.data;

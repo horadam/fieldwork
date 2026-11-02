@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { inferenceAccess, body, failure } from "@/lib/server";
-import { experienceInput } from "@/lib/domain";
-import { analyze, PROMPT_VERSION } from "@/lib/agent";
-import { providerConfig } from "@/lib/ai-provider";
+import { experienceInput, MAX_JD_CHARS } from "@/lib/domain";
+import { analyze } from "@/lib/agent";
+import { AIError, providerConfig } from "@/lib/ai-provider";
 export const runtime = "nodejs";
 export const maxDuration = 200;
 export async function POST(req: NextRequest) {
@@ -12,34 +12,29 @@ export async function POST(req: NextRequest) {
     await inferenceAccess(req, true);
     const { jd, experience } = z
       .object({
-        jd: z.string().min(20).max(15000),
+        jd: z.string().min(20).max(MAX_JD_CHARS),
         experience: z
           .array(experienceInput.extend({ id: z.string().min(1).max(100) }))
           .max(50),
       })
       .parse(await body(req, 400000));
     const config = providerConfig();
-    const result = await analyze(
-      jd,
-      experience,
-      config.model,
-      "grounded",
-      config,
-      req.signal,
-    );
+    const { output, metadata } = await analyze(jd, experience, config, {
+      signal: req.signal,
+    });
     return NextResponse.json(
-      {
-        ...result,
-        provider: config.provider,
-        model: config.model,
-        promptVersion: PROMPT_VERSION,
-      },
+      { output, ...metadata },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
     const response = failure(error);
     return NextResponse.json(
-      { ...(await response.json()), durationMs: Date.now() - started },
+      {
+        ...(await response.json()),
+        ...(error instanceof AIError && error.usage
+          ? error.usage
+          : { durationMs: Date.now() - started }),
+      },
       { status: response.status, headers: { "Cache-Control": "no-store" } },
     );
   }
