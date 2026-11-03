@@ -1,3 +1,4 @@
+import { STEPS } from "./pricing";
 import { z } from "zod";
 import { AIError, type Provider } from "./ai-provider";
 import { structuredCompletion } from "./model-call";
@@ -34,7 +35,7 @@ export async function extractJob(
     schemaName: "job_listing",
     system: jobExtractionPrompt,
     user: (schema) => JSON.stringify({ sourceText: source.text, schema }),
-    maxTokens: 5500,
+    maxTokens: STEPS.job.maxOutput,
     promptVersion: JOB_IMPORT_PROMPT_VERSION,
     validate: (raw) => {
       const draft = jobDraftSchema.parse(raw);

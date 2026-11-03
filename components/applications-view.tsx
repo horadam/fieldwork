@@ -7,6 +7,9 @@ import {
   type Run,
   type Workspace as Data,
 } from "@/lib/domain";
+import { usageLabel } from "@/lib/pricing";
+import type { AiStatus } from "./hooks/use-ai-status";
+import { CostHint } from "./ui/cost-hint";
 
 type Section = "jd" | "fit" | "plan";
 const sections: { id: Section; label: string }[] = [
@@ -39,7 +42,16 @@ function runMeta(run: Run) {
       : run.duration_ms && run.duration_ms > 0
         ? `${(run.duration_ms / 1000).toFixed(1)} s`
         : "duration not recorded";
-  return `${run.provider || "openai"} · ${run.model} · ${when} · ${duration}`;
+  const usage =
+    run.input_tokens || run.output_tokens
+      ? ` · ${usageLabel({
+          provider: run.provider || "openai",
+          model: run.model,
+          inputTokens: run.input_tokens || 0,
+          outputTokens: run.output_tokens || 0,
+        })}`
+      : "";
+  return `${run.provider || "openai"} · ${run.model} · ${when} · ${duration}${usage}`;
 }
 
 function OverflowMenu({
@@ -156,6 +168,7 @@ export function ApplicationsView({
   mode,
   busy,
   aiReady,
+  ai,
   runningJob,
   selectedRun,
   onSelectRun,
@@ -170,6 +183,7 @@ export function ApplicationsView({
   mode: "demo" | "live";
   busy: boolean;
   aiReady: boolean;
+  ai?: AiStatus | null;
   runningJob: string | null;
   selectedRun: string | null;
   onSelectRun: (id: string | null) => void;
@@ -359,11 +373,24 @@ export function ApplicationsView({
               />
             </div>
           </div>
-          {!aiReady && (
+          {!aiReady ? (
             <p className="tiny muted">
-              Analysis needs a configured model. Check the status in the header,
-              or use a simulated preview from the ⋯ menu.
+              Analysis needs a model. Sign in, or add your own OpenAI key from
+              the status in the header. You can also use a simulated preview
+              from the ⋯ menu.
             </p>
+          ) : (
+            <CostHint
+              ai={ai ?? null}
+              step="analysis"
+              sourceChars={
+                job.jd.length +
+                workspace.experience.reduce(
+                  (n, e) => n + e.title.length + e.body.length,
+                  0,
+                )
+              }
+            />
           )}
 
           <div

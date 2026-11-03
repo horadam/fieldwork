@@ -1,11 +1,13 @@
 "use client";
-import type { AiStatus } from "../hooks/use-ai-status";
+import { useUserKeyState, type AiStatus } from "../hooks/use-ai-status";
+import { ModelKey, ModelPrice, SessionTotal } from "./model-key";
 
 export function Topbar({
   section,
   mode,
   email,
   ai,
+  aiProblem,
   onRefreshStatus,
   onSignIn,
   onSignOut,
@@ -14,10 +16,13 @@ export function Topbar({
   mode: "demo" | "live";
   email: string;
   ai: AiStatus | null;
+  // Why status could not be loaded, e.g. a rejected key format.
+  aiProblem: string;
   onRefreshStatus: () => void;
   onSignIn: () => void;
   onSignOut: () => void;
 }) {
+  const { usage } = useUserKeyState();
   return (
     <div className="topbar">
       <p>
@@ -32,7 +37,7 @@ export function Topbar({
             />
             {email || "Browser storage"} ·{" "}
             {ai
-              ? `${ai.provider} ${ai.model} ${ai.ready ? "ready" : "unavailable"}`
+              ? `${ai.provider} ${ai.model}${ai.source === "user" ? " (your key)" : ""} ${ai.ready ? "ready" : "unavailable"}`
               : "model status unavailable"}
           </summary>
           <div className="status-panel">
@@ -42,7 +47,7 @@ export function Topbar({
               </strong>
               <br />
               {mode === "demo"
-                ? "Records are saved in this browser. Real analysis sends the selected JD and experience to the configured model. Simulated preview calls no model."
+                ? "Records are saved in this browser. Real analysis sends the selected JD and experience to the model below. Simulated preview calls no model."
                 : `Signed in as ${email}. Records are saved to your Supabase workspace.`}
             </p>
             <p className="tiny">
@@ -51,19 +56,22 @@ export function Topbar({
                   ? `${ai.provider} · ${ai.model}`
                   : "Model status unavailable"}
               </strong>
-              {ai?.message && (
+              {(ai?.message || aiProblem) && (
                 <>
                   <br />
-                  {ai.message}
+                  {ai?.message || aiProblem}
                 </>
               )}
             </p>
+            {ai && <ModelPrice ai={ai} />}
+            <SessionTotal usage={usage} />
             <button
               className="button secondary small"
               onClick={onRefreshStatus}
             >
               Refresh model status
             </button>
+            <ModelKey />
           </div>
         </details>
         {mode === "live" ? (

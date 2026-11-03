@@ -1,3 +1,4 @@
+import { STEPS } from "./pricing";
 import { Agent, Runner, tool } from "@openai/agents";
 import { z } from "zod";
 import {
@@ -82,7 +83,7 @@ export async function analyze(
     tools: [jobTool, experienceTool],
     outputType: analysisSchema,
     modelSettings: {
-      maxTokens: 4500,
+      maxTokens: STEPS.analysis.maxOutput,
       retry: { maxRetries: 0 },
       ...(config.provider === "ollama"
         ? { providerData: { reasoning_effort: "none" } }
@@ -106,7 +107,7 @@ export async function analyze(
           })
         : "Analyze the selected job against the user-confirmed experience, then propose an interview preparation plan.";
     const result = await runner.run(agent, input, {
-      maxTurns: 6,
+      maxTurns: STEPS.analysis.maxTurns,
       signal: combined,
     });
     usage.inputTokens = result.state.usage.inputTokens || 0;
@@ -138,7 +139,11 @@ export async function analyze(
   } catch (error) {
     usage.durationMs = Date.now() - started;
     const failure = analysisError(config, error, deadline, signal);
-    failure.usage = usage;
+    failure.usage = {
+      ...usage,
+      provider: config.provider,
+      model: config.model,
+    };
     throw failure;
   }
 }

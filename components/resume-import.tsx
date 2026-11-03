@@ -15,6 +15,9 @@ import {
 import type { Experience } from "@/lib/domain";
 import type { Provenance } from "@/lib/resume";
 import { parseResumePdf } from "@/lib/pdf-browser";
+import { usageLabel } from "@/lib/pricing";
+import type { AiStatus } from "./hooks/use-ai-status";
+import { CostHint } from "./ui/cost-hint";
 
 type Review = ReviewDraft;
 type Metadata = {
@@ -22,16 +25,20 @@ type Metadata = {
   model: string;
   promptVersion: string;
   durationMs: number;
+  inputTokens?: number;
+  outputTokens?: number;
 };
 export function ResumeImport({
   existing,
   provider,
+  ai = null,
   request,
   confirm,
   close,
 }: {
   existing: Experience[];
   provider: string;
+  ai?: AiStatus | null;
   request: (
     source: ResumeSource,
     signal: AbortSignal,
@@ -285,6 +292,7 @@ export function ResumeImport({
               Back / correct text
             </button>
           </div>
+          <CostHint ai={ai} step="resume" sourceChars={source.text.length} />
         </>
       )}
       {step === "review" && (
@@ -404,6 +412,13 @@ export function ResumeImport({
             <p className="tiny muted">
               {metadata.provider} · {metadata.model} · {metadata.promptVersion}{" "}
               · {metadata.durationMs} ms
+              {metadata.inputTokens !== undefined &&
+                ` · ${usageLabel({
+                  provider: metadata.provider,
+                  model: metadata.model,
+                  inputTokens: metadata.inputTokens,
+                  outputTokens: metadata.outputTokens ?? 0,
+                })}`}
             </p>
           )}
         </>

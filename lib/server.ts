@@ -1,4 +1,9 @@
-import { AIError } from "./ai-provider";
+import {
+  AIError,
+  hasUserKey,
+  requestProvider,
+  type Provider,
+} from "./ai-provider";
 import { supabaseConfig } from "./supabase-config";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
@@ -70,9 +75,14 @@ export async function body(req: NextRequest, limit = 35000) {
   }
 }
 export function failure(error: unknown) {
+  // Usage is kept on failures so the browser can show what a failed call cost.
   if (error instanceof AIError)
     return NextResponse.json(
-      { error: error.message, code: error.code },
+      {
+        error: error.message,
+        code: error.code,
+        ...(error.usage ? { usage: error.usage } : {}),
+      },
       { status: error.status },
     );
   if (error instanceof HttpError)
@@ -139,7 +149,16 @@ export function localWorkspaceAllowed(req: NextRequest) {
     !req.headers.has("forwarded")
   );
 }
-export async function inferenceAccess(req: NextRequest, localOnly = false) {
+/**
+ * Who may run a model call: a signed-in user, a visitor who brings their own
+ * OpenAI key (they pay, so no account is needed), or local development.
+ * Returns the account session, or null for the browser workspace.
+ */
+export async function inferenceAccess(
+  req: NextRequest,
+  localOnly = false,
+  { allowUserKey = true } = {},
+) {
   if (req.headers.get("authorization")?.match(/^Bearer (.+)$/)) {
     if (localOnly)
       throw new HttpError(
@@ -148,10 +167,17 @@ export async function inferenceAccess(req: NextRequest, localOnly = false) {
       );
     return authenticated(req);
   }
+  if (allowUserKey && hasUserKey(req.headers)) {
+    requestProvider(req.headers); // Rejects a malformed key or model.
+    return null;
+  }
   if (!localWorkspaceAllowed(req))
     throw new HttpError(
       403,
-      "Local inference requires LOCAL_WORKSPACE_ENABLED=true, development mode, loopback hosting, and a same-origin request. Hosted use requires sign-in.",
+      (allowUserKey
+        ? "Sign in, or add your own OpenAI key in the model panel, to run AI steps here."
+        : "Sign in to import jobs from a URL here, or paste the job text instead.") +
+        " Local development without an account needs LOCAL_WORKSPACE_ENABLED=true, development mode, loopback hosting and a same-origin request.",
     );
   return null;
 }
@@ -160,13 +186,15 @@ export type InferenceKind =
   | "resume_extraction"
   | "job_extraction"
   | "preparation_generation";
-// Hosted (signed-in) calls spend the per-hour quota in 005_inference_usage.sql;
-// local development calls (no account) are not metered.
+// Hosted (signed-in) calls on the server's key spend the per-hour quota in
+// 005_inference_usage.sql. Calls without an account, or on the user's own
+// key, are not metered here.
 export async function reserveInference(
   access: Awaited<ReturnType<typeof inferenceAccess>>,
   kind: InferenceKind,
+  config?: Provider,
 ) {
-  if (!access) return;
+  if (!access || config?.apiKey) return;
   const { error } = await access.db.rpc("reserve_inference", { p_kind: kind });
   if (!error) return;
   if (error.message.includes("Hourly"))

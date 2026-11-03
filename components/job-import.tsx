@@ -1,16 +1,27 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { jobInput, type Job } from "@/lib/domain";
+import { usageLabel, type CallRecord } from "@/lib/pricing";
+import type { AiStatus } from "./hooks/use-ai-status";
+import { CostHint } from "./ui/cost-hint";
 
 type Page = { url: string; title: string; text: string; warnings: string[] };
-type Draft = { company: string; role: string; jd: string; warnings: string[] };
+type Draft = {
+  company: string;
+  role: string;
+  jd: string;
+  warnings: string[];
+  metadata?: CallRecord;
+};
 export function JobImport({
   provider,
+  ai = null,
   request,
   confirm,
   close,
 }: {
   provider: string;
+  ai?: AiStatus | null;
   request: (
     path: string,
     value: unknown,
@@ -226,6 +237,7 @@ export function JobImport({
               Back
             </button>
           </div>
+          <CostHint ai={ai} step="job" sourceChars={text.length} />
         </>
       )}
       {step === "review" && (
@@ -233,6 +245,8 @@ export function JobImport({
           <p className="tiny muted">
             Check the listing against its source. AI extraction can omit or
             misinterpret details.
+            {draft.metadata &&
+              ` Extraction used ${usageLabel(draft.metadata)}.`}
           </p>
           <label>
             Company

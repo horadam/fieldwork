@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { providerConfig, providerStatus } from "@/lib/ai-provider";
+import { requestProvider, providerStatus } from "@/lib/ai-provider";
 import { inferenceAccess, failure } from "@/lib/server";
 export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   try {
-    const config = providerConfig();
+    const config = requestProvider(req.headers);
     let allowed = true,
       accessMessage = "";
     try {
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     } catch {
       allowed = false;
       accessMessage =
-        "Sign in, or enable LOCAL_WORKSPACE_ENABLED=true in development on localhost.";
+        "Sign in, or add your own OpenAI key, to run AI steps here.";
     }
     // Public response is non-secret and never queries model readiness for disallowed callers.
     const status = allowed

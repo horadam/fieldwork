@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticated, body, failure, HttpError } from "@/lib/server";
 import { analyze, ANALYSIS_PROMPT_VERSION } from "@/lib/agent";
-import { AIError, providerConfig, providerError } from "@/lib/ai-provider";
+import { AIError, providerError, requestProvider } from "@/lib/ai-provider";
 import type { Experience } from "@/lib/domain";
 export const runtime = "nodejs";
 export const maxDuration = 200;
 export async function POST(req: NextRequest) {
   try {
     const { db } = await authenticated(req);
-    const config = providerConfig();
+    const config = requestProvider(req.headers);
     const { applicationId } = z
       .object({ applicationId: z.string().uuid() })
       .parse(await body(req));
@@ -75,7 +75,17 @@ export async function POST(req: NextRequest) {
         500,
         "The analysis finished but could not be saved. Retry after five minutes, when the stale run expires.",
       );
-    return NextResponse.json({ ok: true, runId: record.id });
+    return NextResponse.json({
+      ok: true,
+      runId: record.id,
+      usage: {
+        provider: config.provider,
+        model: config.model,
+        durationMs: result.metadata.durationMs,
+        inputTokens: result.metadata.inputTokens,
+        outputTokens: result.metadata.outputTokens,
+      },
+    });
   } catch (e) {
     return failure(e);
   }

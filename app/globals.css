@@ -1157,3 +1157,29 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* Bring-your-own OpenAI key, inside the model status panel. */
+.model-key {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.model-key .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.form label.inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.form label.inline input {
+  width: auto;
+}
+/* What an AI step will cost at most, shown next to its button. */
+.cost-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}

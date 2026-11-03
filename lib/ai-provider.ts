@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import { DEFAULT_USER_MODEL } from "./pricing";
+import { USER_KEY_HEADER, USER_MODEL_HEADER } from "./user-key";
 import {
   OpenAIChatCompletionsModel,
   OpenAIResponsesModel,
@@ -8,12 +10,18 @@ export type Provider = {
   provider: "ollama" | "openai";
   model: string;
   deadlineMs: number;
+  // A visitor's own OpenAI key, for this request only. Non-enumerable, so it
+  // never ends up in a response, log or stored record built from the config.
+  readonly apiKey?: string;
 };
 export const OLLAMA_URL = "http://127.0.0.1:11434";
 export type CallUsage = {
   durationMs: number;
   inputTokens: number;
   outputTokens: number;
+  // Set on failures, so the browser can price a call that did not finish.
+  provider?: Provider["provider"];
+  model?: string;
 };
 export class AIError extends Error {
   // Set on failures after a model call started, so callers can record cost.
@@ -49,12 +57,39 @@ export function providerConfig(): Provider {
     deadlineMs: provider === "ollama" ? 180000 : 45000,
   };
 }
+const userKeyPattern = /^sk-[A-Za-z0-9_-]{20,300}$/;
+const userModelPattern = /^[a-z0-9][a-z0-9._:-]{0,63}$/i;
+
+export const hasUserKey = (headers: Headers) => headers.has(USER_KEY_HEADER);
+
+// The visitor's key and model when supplied, otherwise the server's provider.
+export function requestProvider(headers: Headers): Provider {
+  const key = headers.get(USER_KEY_HEADER);
+  if (key === null) return providerConfig();
+  const model = headers.get(USER_MODEL_HEADER) || DEFAULT_USER_MODEL;
+  if (!userKeyPattern.test(key))
+    throw new AIError(
+      "That doesn't look like an OpenAI API key. Check it in the model panel.",
+      "user_key_invalid",
+      400,
+    );
+  if (!userModelPattern.test(model))
+    throw new AIError(
+      "Enter an OpenAI model name, such as gpt-6.1-terra.",
+      "user_model_invalid",
+      400,
+    );
+  const config: Provider = { provider: "openai", model, deadlineMs: 45000 };
+  Object.defineProperty(config, "apiKey", { value: key, enumerable: false });
+  return config;
+}
+
 export function openAIClient(config: Provider) {
-  if (config.provider === "openai" && !process.env.OPENAI_API_KEY)
+  const apiKey = config.apiKey ?? process.env.OPENAI_API_KEY;
+  if (config.provider === "openai" && !apiKey)
     throw new AIError("Set OPENAI_API_KEY on the server, or select Ollama.");
   return new OpenAI({
-    apiKey:
-      config.provider === "ollama" ? "local-only" : process.env.OPENAI_API_KEY,
+    apiKey: config.provider === "ollama" ? "local-only" : apiKey,
     baseURL:
       config.provider === "ollama"
         ? `${OLLAMA_URL}/v1`
@@ -106,6 +141,29 @@ export function providerError(config: Provider, error: unknown): AIError {
       );
     }
   }
+  if (config.provider === "openai") {
+    // OpenAI's own error text is never forwarded: it can quote the key.
+    const status = (error as { status?: number } | null)?.status;
+    const whose = config.apiKey ? "your" : "the server's";
+    if (status === 401)
+      return new AIError(
+        `OpenAI rejected ${whose} API key. Check the key, then retry. No automatic retry was made.`,
+        "openai_key_rejected",
+        400,
+      );
+    if (status === 429)
+      return new AIError(
+        `OpenAI refused the request for ${whose} key: rate limit or no remaining credit. Check the account's limits and billing, then retry. No automatic retry was made.`,
+        "openai_rate_limited",
+        429,
+      );
+    if (status === 404 || status === 403)
+      return new AIError(
+        `${whose === "your" ? "Your" : "The server's"} OpenAI key can't use ${config.model}. Check the model name, then retry. No automatic retry was made.`,
+        "openai_model_unavailable",
+        400,
+      );
+  }
   return new AIError(
     config.provider === "ollama"
       ? `Local inference failed, timed out, or returned invalid output. Open Ollama, ensure ${config.model} is installed, and retry. No OpenAI request or fallback was made.`
@@ -114,6 +172,15 @@ export function providerError(config: Provider, error: unknown): AIError {
   );
 }
 export async function providerStatus(config: Provider) {
+  // Making a test call would spend the visitor's money, so none is made.
+  if (config.apiKey)
+    return {
+      ...config,
+      source: "user" as const,
+      ready: true,
+      message:
+        "Using your OpenAI key. The key and model are checked when a request runs.",
+    };
   if (config.provider === "openai")
     return {
       ...config,

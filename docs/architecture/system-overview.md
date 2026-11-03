@@ -45,18 +45,20 @@ flowchart TB
 
 ## Independent choices
 
-| Choice             | Current implementation                                                                                              |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| Storage            | Signed out uses browser records; signed in uses owned Supabase records. Signing in does not upload browser records. |
-| Inference          | `AI_PROVIDER` selects Ollama or OpenAI for the server. There is no per-user model picker or automatic fallback.     |
-| General practice   | Static questions/roadmap and browser-local notes, scores, and checkboxes, isolated by browser/account key.          |
-| Target preparation | Targets, immutable plan versions, and progress use browser storage or Supabase according to the session.            |
+| Choice             | Current implementation                                                                                                                               |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Storage            | Signed out uses browser records; signed in uses owned Supabase records. Signing in does not upload browser records.                                  |
+| Inference          | `AI_PROVIDER` selects Ollama or OpenAI for the server. A visitor may instead send their own OpenAI key and model per request. No automatic fallback. |
+| General practice   | Static questions/roadmap and browser-local notes, scores, and checkboxes, isolated by browser/account key.                                           |
+| Target preparation | Targets, immutable plan versions, and progress use browser storage or Supabase according to the session.                                             |
 
 `/api/analyze/local` means the browser-workspace analysis path, not an Ollama-only
 provider. Browser storage + OpenAI and Supabase + Ollama are both supported code
 paths. Unauthenticated inference requires explicit local-workspace opt-in,
 development execution, loopback hosting, same origin, and the forwarding/hosting
-checks in the server guard. Hosted use requires authentication.
+checks in the server guard. Hosted use requires authentication or the visitor's
+own OpenAI key (`x-openai-key`), which unlocks every model route except URL
+fetching.
 
 Ollama's `127.0.0.1` refers to the **Next.js server's machine**. Deploying Next.js
 does not give it access to a model running on the user's laptop. OpenAI readiness

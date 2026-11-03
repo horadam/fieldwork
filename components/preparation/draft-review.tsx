@@ -1,4 +1,5 @@
 "use client";
+import { usageLabel } from "@/lib/pricing";
 import {
   schedulePlan,
   settingsSchema,
@@ -64,7 +65,12 @@ export function DraftReview({
           {draft.metadata.promptVersion} ·{" "}
           {(draft.metadata.durationMs / 1000).toFixed(1)} s
           {draft.metadata.outputTokens !== undefined &&
-            ` · ${draft.metadata.inputTokens} in / ${draft.metadata.outputTokens} out tokens`}
+            ` · ${usageLabel({
+              provider: draft.metadata.provider,
+              model: draft.metadata.model,
+              inputTokens: draft.metadata.inputTokens ?? 0,
+              outputTokens: draft.metadata.outputTokens,
+            })}`}
         </p>
         <TimingFields
           value={draft.settings}
