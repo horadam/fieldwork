@@ -4,6 +4,7 @@
 export const PRICES_AS_OF = "2026-11-03";
 export const PRICING_URL = "https://developers.openai.com/api/docs/pricing";
 export const USAGE_URL = "https://platform.openai.com/usage";
+export const KEYS_URL = "https://platform.openai.com/api-keys";
 // Suggested for visitors who bring their own key; any listed model works.
 export const DEFAULT_USER_MODEL = "gpt-6.1-terra";
 

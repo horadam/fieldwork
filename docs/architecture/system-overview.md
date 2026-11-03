@@ -58,7 +58,8 @@ paths. Unauthenticated inference requires explicit local-workspace opt-in,
 development execution, loopback hosting, same origin, and the forwarding/hosting
 checks in the server guard. Hosted use requires authentication or the visitor's
 own OpenAI key (`x-openai-key`), which unlocks every model route except URL
-fetching.
+fetching. Because that key sits in browser storage, pages carry a nonce-based
+Content-Security-Policy set per request in `proxy.ts`.
 
 Ollama's `127.0.0.1` refers to the **Next.js server's machine**. Deploying Next.js
 does not give it access to a model running on the user's laptop. OpenAI readiness

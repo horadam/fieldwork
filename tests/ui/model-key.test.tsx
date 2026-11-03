@@ -151,6 +151,19 @@ describe("model key panel", () => {
     expect(screen.getByRole("button", { name: "Use your own OpenAI key" }));
   });
 
+  it("recommends a limited, revocable key", () => {
+    render(<ModelKey />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use your own OpenAI key" }),
+    );
+    expect(document.body.textContent).toContain("monthly budget");
+    expect(
+      screen
+        .getByRole("link", { name: "OpenAI API keys" })
+        .getAttribute("href"),
+    ).toBe("https://platform.openai.com/api-keys");
+  });
+
   it("rejects something that isn't a key", () => {
     render(<ModelKey />);
     fireEvent.click(

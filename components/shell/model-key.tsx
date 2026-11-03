@@ -2,6 +2,7 @@
 import { useId, useState, type FormEvent } from "react";
 import {
   DEFAULT_USER_MODEL,
+  KEYS_URL,
   formatCost,
   modelPrice,
   PRICED_MODELS,
@@ -115,6 +116,13 @@ export function ModelKey() {
         Your key is sent to this app&apos;s server with each AI request and
         passed straight to OpenAI. The server doesn&apos;t store or log it. You
         pay OpenAI for what you use.
+      </p>
+      <p className="tiny">
+        <strong>Use a limited key:</strong> create one in a separate OpenAI
+        project with a monthly budget, and revoke it when you&apos;re done.{" "}
+        <a href={KEYS_URL} target="_blank" rel="noreferrer">
+          OpenAI API keys
+        </a>
       </p>
       {invalid && (
         <p role="alert" className="notice error">
