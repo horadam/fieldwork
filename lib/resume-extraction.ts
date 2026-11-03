@@ -1,3 +1,4 @@
+import { STEPS } from "./pricing";
 import { AIError, type Provider } from "./ai-provider";
 import { structuredCompletion } from "./model-call";
 import {
@@ -30,7 +31,7 @@ export async function extractResume(
     schemaName: "resume_experience",
     system: extractionPrompt,
     user: (schema) => JSON.stringify({ sourceText: input.text, schema }),
-    maxTokens: 6500,
+    maxTokens: STEPS.resume.maxOutput,
     promptVersion: RESUME_PROMPT_VERSION,
     validate: (raw) => {
       try {

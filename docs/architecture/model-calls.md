@@ -11,10 +11,11 @@ read-only tools, but it follows the same deadline, retry and usage rules.
 
 ```mermaid
 flowchart TB
-  ROUTE["Route handler"] --> GUARD["inferenceAccess(): signed-in user or local dev"]
-  GUARD --> QUOTA{"Signed in?"}
+  ROUTE["Route handler"] --> GUARD["inferenceAccess(): signed-in user, visitor's own key, or local dev"]
+  GUARD --> CONFIG["requestProvider(): visitor's key + model, else server provider"]
+  CONFIG --> QUOTA{"Signed in on the server's key?"}
   QUOTA -->|"Yes"| RESERVE["reserve_inference(kind): hourly limit"]
-  QUOTA -->|"No (local dev)"| CALL
+  QUOTA -->|"No (own key or local dev)"| CALL
   RESERVE -->|"Over limit"| E429["429, no model call"]
   RESERVE --> CALL["structuredCompletion()"]
   CALL --> DEADLINE["AbortSignal: provider deadline + caller cancel"]
@@ -48,6 +49,25 @@ flowchart TB
 - **No silent truncation.** Oversized inputs are rejected before the call.
   Over-long outputs, such as a JD above 15,000 characters, get their own error.
 
+## Visitor's own key
+
+`requestProvider(headers)` turns `x-openai-key` and `x-openai-model` into an
+OpenAI config for that request. The key is a non-enumerable field, so spreading
+or serializing the config never includes it, and `openAIClient()` prefers it to
+`OPENAI_API_KEY`. A visitor's key may only run models in the price table
+(`user_model_unpriced` otherwise). `GET /api/ai/models` lists the key's models
+through OpenAI's free models endpoint, which checks the key before any billed
+call and limits the model menu to priced models that key can use. Status
+reports "your key" without a test call. Calls on a
+visitor's key skip the hosted quota. URL fetching (`/api/jobs/fetch`) is never
+opened by a key.
+
+Every response, including failures, carries usage with provider and model. The
+browser's API client adds each call to a session total, and
+[`lib/pricing.ts`](../../lib/pricing.ts) turns tokens into cost and each step's
+reply limit into a pre-run ceiling. The same constants set the steps'
+`maxTokens`, so the ceiling can't drift from the real limit.
+
 ## Hosted quota
 
 [Migration 005](../../supabase/migrations/005_inference_usage.sql) adds an
@@ -70,5 +90,9 @@ Local development calls without an account are not metered.
   [quota helper](../../lib/server.ts).
 - Callers: [resume](../../lib/resume-extraction.ts), [job](../../lib/job-extraction.ts),
   [preparation](../../lib/preparation-generation.ts), [fit analysis](../../lib/agent.ts).
+- Visitor key and pricing: [provider](../../lib/ai-provider.ts),
+  [browser key store](../../lib/user-key.ts), [prices](../../lib/pricing.ts).
 - Tests: [wrapper](../../tests/model-call.test.ts),
+  [visitor key](../../tests/user-key.test.ts), [pricing](../../tests/pricing.test.ts),
+  [key panel and cost hints](../../tests/ui/model-key.test.tsx),
   [quota in Postgres](../../tests/inference-quota.test.ts).

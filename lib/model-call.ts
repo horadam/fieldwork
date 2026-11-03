@@ -234,7 +234,11 @@ export async function structuredCompletion<T>(options: {
         499,
       );
     else failure = providerError(config, error);
-    failure.usage = usage;
+    failure.usage = {
+      ...usage,
+      provider: config.provider,
+      model: config.model,
+    };
     throw failure;
   }
 }

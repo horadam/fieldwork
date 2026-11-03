@@ -7,7 +7,7 @@ import {
   HttpError,
   reserveInference,
 } from "@/lib/server";
-import { providerConfig } from "@/lib/ai-provider";
+import { requestProvider } from "@/lib/ai-provider";
 import {
   planSources,
   SourceError,
@@ -79,11 +79,12 @@ export async function POST(req: NextRequest) {
       workspace = parsed.data as Workspace;
     }
     const sources = await planSources(target, workspace);
-    await reserveInference(access, "preparation_generation");
+    const config = requestProvider(req.headers);
+    await reserveInference(access, "preparation_generation", config);
     const result = await generatePreparation(
       sources,
       input.settings,
-      providerConfig(),
+      config,
       req.signal,
     );
     return NextResponse.json(

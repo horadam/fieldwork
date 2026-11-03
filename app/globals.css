@@ -7,6 +7,12 @@
   --accent: #b94b2c;
   --green: #3e6149;
   --card: #fffef9;
+  /* Edges of interactive controls: at least 3:1 against card and paper
+     (WCAG 1.4.11). --line is for dividers only. */
+  --control-border: #858a81;
+  /* Outlined buttons get their own tint, distinct from card and paper. */
+  --control-fill: #eef0e9;
+  --control-hover: #e1e5da;
 }
 * {
   box-sizing: border-box;
@@ -196,10 +202,18 @@ h3 {
   font-weight: 600;
   white-space: nowrap;
 }
+/* Filled buttons lighten on hover; outlined ones take a tinted fill. */
+.button:not(.secondary, .danger):hover:not(:disabled) {
+  filter: brightness(1.15);
+}
 .button.secondary {
-  background: transparent;
+  background: var(--control-fill);
   color: var(--ink);
-  border-color: var(--line);
+  border-color: var(--control-border);
+}
+.button.secondary:hover:not(:disabled) {
+  background: var(--control-hover);
+  border-color: var(--ink);
 }
 .button.accent {
   background: var(--accent);
@@ -211,8 +225,12 @@ h3 {
 }
 .button.danger {
   color: #a13324;
-  border-color: #dabeb3;
-  background: transparent;
+  border-color: #b8634f;
+  background: var(--card);
+}
+.button.danger:hover:not(:disabled) {
+  background: #f6e7e1;
+  border-color: #a13324;
 }
 .actions {
   display: flex;
@@ -357,7 +375,7 @@ h3 {
 .search {
   width: 100%;
   padding: 11px 12px;
-  border: 1px solid #cdd0c5;
+  border: 1px solid var(--control-border);
   border-radius: 5px;
   background: #fffef9;
   color: var(--ink);
@@ -796,9 +814,15 @@ footer {
   border: 1px solid var(--line);
   border-radius: 9px;
   box-shadow: 0 10px 30px rgba(37, 42, 39, 0.12);
+  /* Spacing comes from the gap, not from each child's margins. */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
 }
+.status-panel > *,
 .status-panel p {
-  margin-bottom: 12px;
+  margin: 0;
 }
 
 .button.green {
@@ -1156,4 +1180,36 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
+}
+
+/* Bring-your-own OpenAI key, inside the model status panel. */
+.model-key {
+  align-self: stretch;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+/* The saved-key summary stacks like the panel around it. */
+.model-key:not(.form) {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+.model-key .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.form label.inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.form label.inline input {
+  width: auto;
+}
+/* What an AI step will cost at most, shown next to its button. */
+.cost-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
 }

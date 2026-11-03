@@ -1,3 +1,4 @@
+import { STEPS } from "./pricing";
 import { AIError, type Provider } from "./ai-provider";
 import { structuredCompletion } from "./model-call";
 import {
@@ -55,7 +56,7 @@ export async function generatePreparation(
     schemaName: "preparation_plan",
     system: preparationPrompt,
     user: payload,
-    maxTokens: 10000,
+    maxTokens: STEPS.preparation.maxOutput,
     promptVersion: PREPARATION_PROMPT_VERSION,
     validate: (raw) => validatePlan(raw, sources),
     signal,

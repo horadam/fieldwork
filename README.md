@@ -19,7 +19,7 @@ flowchart LR
 - **Nothing the model says is trusted by default.** Output is validated with Zod, and every evidence and requirement ID is checked against the inputs. Drafts stay drafts until you confirm them.
 - **Runs locally or hosted.** Local Ollama (`qwen3:8b`) is the default, and OpenAI is an option. Storage is either your browser or a Supabase account protected by row-level security. Storage and model choice are independent.
 - **Engineered for failure.** Every model call has a deadline, makes exactly one attempt and has no fallback. Errors are sanitized. Duration and tokens are recorded even when a call fails. Retries are idempotent, and the hosted plan has hourly quotas.
-- **Measured.** 345 tests cover routes, UI, Postgres RLS (in PGlite) and SSRF-safe fetching. Labelled evals cover resume, job and plan generation; see [the results and known weaknesses](evals/results.md).
+- **Measured.** 401 tests cover routes, UI, Postgres RLS (in PGlite), SSRF-safe fetching and the security headers. Labelled evals cover resume, job and plan generation; see [the results and known weaknesses](evals/results.md).
 
 For a code-guided walkthrough with diagrams, start with the [architecture and flow index](docs/architecture/README.md).
 
@@ -132,7 +132,40 @@ OPENAI_API_KEY=your-server-key
 OPENAI_MODEL=your-account-model
 ```
 
-Use a model supporting structured output and function tools. OpenAI usage is billed to that key. No user-supplied keys, browser-visible keys, automatic fallback, SDK retries, or model downloads are implemented. Local runs use a 180-second total deadline; OpenAI uses 45 seconds. JD analysis retains six turns, ten read-only tool executions, output validation and manual task approval. Ollama receives the validated JD/experience snapshot in its initial message, so a structured response without tool calls still has the selected data and exact evidence IDs. The same read-only tools remain available; tool execution is not guaranteed. Analysis errors distinguish timeout, invalid JSON/tool responses, schema/reference failures and the turn limit. Extraction uses one structured model call and no tools. Tracing is disabled. Extraction errors distinguish connection, model, timeout, JSON/schema failures without echoing model output. Provider errors are sanitized; resume/JD contents are not logged by the app.
+Use a model supporting structured output and function tools. OpenAI usage is billed to that key. No browser-visible server keys, automatic fallback, SDK retries, or model downloads are implemented. Local runs use a 180-second total deadline; OpenAI uses 45 seconds. JD analysis retains six turns, ten read-only tool executions, output validation and manual task approval. Ollama receives the validated JD/experience snapshot in its initial message, so a structured response without tool calls still has the selected data and exact evidence IDs. The same read-only tools remain available; tool execution is not guaranteed. Analysis errors distinguish timeout, invalid JSON/tool responses, schema/reference failures and the turn limit. Extraction uses one structured model call and no tools. Tracing is disabled. Extraction errors distinguish connection, model, timeout, JSON/schema failures without echoing model output. Provider errors are sanitized; resume/JD contents are not logged by the app.
+
+## Use your own OpenAI key
+
+On a hosted copy, visitors without an account can run every AI step on their own OpenAI key. Open the model status in the header, choose **Use your own OpenAI key**, paste the key and choose **Check key**. The app lists the key's models through OpenAI's free `GET /v1/models`, so a wrong or restricted key is caught before any billed call. The visitor then picks from the models that key can use **and** that the app has a price for, cheapest first (`gpt-6.1-terra` is suggested). A visitor's key can only run priced models, so every call shows its cost; models the key has but the price table doesn't cover are named, not offered. Prices stay in a dated table because OpenAI has no prices API.
+
+- **Where the key goes.** It is kept in this browser: in `sessionStorage` until the tab closes, or in `localStorage` with **Remember on this device**. **Forget key** removes it. It is sent to this app's own API routes in an `x-openai-key` header with each AI request, used for that one OpenAI call, and never stored, logged or returned. The server's config object holds it as a non-enumerable field, so it cannot leak into a response or stored record.
+- **What it unlocks.** Resume import, job extraction from pasted text, fit analysis and plan generation. Importing a job **from a URL** still needs an account, since any string would pass as a key and turn the server into an open URL fetcher. Calls on a visitor's key don't count against the hosted hourly quotas.
+- **Errors.** OpenAI's 401, 429 and 404 answers become `openai_key_rejected`, `openai_rate_limited` and `openai_model_unavailable`. OpenAI's own error text is never forwarded, because it can quote the key.
+
+### Security model
+
+A visitor's key lives in their browser and passes through this app's server, so the design assumes three threats:
+
+| Threat                                                | What protects the key                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A script injected into the page reads browser storage | A strict, per-request Content-Security-Policy ([`proxy.ts`](proxy.ts), [`lib/security-headers.ts`](lib/security-headers.ts)): scripts run only with that request's nonce, inline event handlers and `eval` are blocked in production, and network calls may go only to this site and Supabase. The app loads no third-party scripts and never renders raw HTML; React escapes model output. The key is kept only until the tab closes unless the visitor asks to remember it. The policy stops injected markup from running code; like any CSP with `'strict-dynamic'`, it can't contain a script that is already running. |
+| The server keeps or leaks the key                     | It's used for one OpenAI call per request and never stored, logged or returned (a non-enumerable config field, sanitized errors, tests that check responses never contain it). The code is public, so this can be checked.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| The visitor shouldn't have to trust any of the above  | The key form recommends a **project-scoped key with a monthly budget**, revoked afterwards, so the worst case is capped.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+
+This differs from OpenAI's warning against keys in browsers, which is about a developer shipping _their own_ key to every visitor. Here each visitor's key stays in their own browser. Other headers on every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (with `frame-ancestors 'none'`), `Referrer-Policy: same-origin`, a restrictive `Permissions-Policy`, and HSTS. The page is rendered per request so each response gets its own nonce.
+
+### What each step costs
+
+Every step has a fixed reply limit, so the app shows the most a step can cost before you run it ("at most ≈ $0.03"), and the actual tokens and cost after. The model panel shows the price per 1M tokens and a running total for the session. Prices come from a table in [`lib/pricing.ts`](lib/pricing.ts), checked against [OpenAI's pricing page](https://developers.openai.com/api/docs/pricing) on the date it records; models not in the table show tokens only. OpenAI's usage dashboard is the actual bill.
+
+| Step             | Sends                                                      | Reply limit           | Ceiling                                              |
+| ---------------- | ---------------------------------------------------------- | --------------------- | ---------------------------------------------------- |
+| Resume import    | the inspected resume text                                  | 6,500 tokens          | 1 call                                               |
+| Job extraction   | the inspected listing text                                 | 5,500 tokens          | 1 call                                               |
+| Fit analysis     | the JD and your experience bank                            | 4,500 tokens per turn | up to 6 agent turns, each resending the conversation |
+| Preparation plan | the target jobs, their latest analyses and your experience | 10,000 tokens         | 1 call                                               |
+
+Estimated cost = (instructions + source characters ÷ 4) × input price + reply limit × output price, per turn. Real calls usually stay well below the ceiling, especially fit analysis. Failed calls are shown and counted too, since OpenAI may still bill them.
 
 ## Optional Supabase storage / hosted use
 
@@ -194,7 +227,7 @@ The JD comparison performs baseline and grounded runs across 20 cases, 40 model 
 
 ## Deploying
 
-Any Next.js host works with Supabase accounts and `AI_PROVIDER=openai`. A hosted server cannot reach a laptop's Ollama. Hosted use requires sign-in, and the local, account-less mode is refused outside loopback development. Set the Supabase URL and publishable key, `OPENAI_API_KEY` and `OPENAI_MODEL` as server environment variables, apply migrations 001–005, and add the deployed URL to Supabase's redirect allowlist. No demo deployment is maintained.
+Any Next.js host works with Supabase accounts and `AI_PROVIDER=openai`. A hosted server cannot reach a laptop's Ollama. Hosted AI steps need sign-in or the visitor's own OpenAI key; the local, account-less mode is refused outside loopback development. With no environment variables at all, a hosted copy still runs: browser storage, Simulated preview, and AI steps on visitors' own keys. Set the Supabase URL and publishable key, `OPENAI_API_KEY` and `OPENAI_MODEL` as server environment variables, apply migrations 001–005, and add the deployed URL to Supabase's redirect allowlist. No demo deployment is maintained.
 
 ## Implementation map
 
@@ -203,6 +236,8 @@ Any Next.js host works with Supabase accounts and `AI_PROVIDER=openai`. A hosted
 - `lib/domain.ts`, `lib/resume.ts`, `lib/preparation-plan.ts`: schemas, validation, local reducers and the deterministic scheduler.
 - `lib/job-page.ts`, `lib/pdf-text.ts`, `lib/pdf-browser.ts`: SSRF-safe page fetching and PDF text extraction.
 - `lib/store/`, `lib/api-client.ts`: browser and account storage behind one interface.
+- `lib/user-key.ts`, `lib/pricing.ts`: a visitor's own OpenAI key, prices, cost ceilings and the session total.
+- `proxy.ts`, `lib/security-headers.ts`: the per-request Content-Security-Policy and the security headers on every response.
 - `components/workspace.tsx`: the shell. It uses `components/hooks/` (data, model status, practice notes, nav), `components/shell/`, `components/views/` and `components/modals/`.
 - `components/applications-view.tsx`: application list, fit analysis and plan approval.
 - `components/preparation-workspace.tsx` and `components/preparation/`: targets, plan generation, review, practice, schedule and tasks.

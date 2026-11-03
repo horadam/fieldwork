@@ -3,7 +3,7 @@ import { z } from "zod";
 import { inferenceAccess, body, failure } from "@/lib/server";
 import { experienceInput, MAX_JD_CHARS } from "@/lib/domain";
 import { analyze } from "@/lib/agent";
-import { AIError, providerConfig } from "@/lib/ai-provider";
+import { AIError, requestProvider } from "@/lib/ai-provider";
 export const runtime = "nodejs";
 export const maxDuration = 200;
 export async function POST(req: NextRequest) {
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
           .max(50),
       })
       .parse(await body(req, 400000));
-    const config = providerConfig();
+    const config = requestProvider(req.headers);
     const { output, metadata } = await analyze(jd, experience, config, {
       signal: req.signal,
     });

@@ -117,6 +117,7 @@ export default function Workspace() {
           mode={ws.mode}
           email={ws.email}
           ai={ai.status}
+          aiProblem={ai.problem}
           onRefreshStatus={ai.refresh}
           onSignIn={() => open({ type: "auth" })}
           onSignOut={ws.signOut}
@@ -205,6 +206,7 @@ export default function Workspace() {
             mode={ws.mode}
             busy={ws.busy}
             aiReady={!!ai.status?.ready}
+            ai={ai.status}
             runningJob={ws.runningJob}
             selectedRun={ws.selectedRun}
             onSelectRun={ws.setSelectedRun}
@@ -237,6 +239,7 @@ export default function Workspace() {
           shellBusy={ws.busy}
           savingTask={ws.savingTask}
           provider={ai.label}
+          ai={ai.status}
         />
 
         {tab === "practice" && generalPreparation && (
@@ -272,6 +275,7 @@ export default function Workspace() {
           {modal.type === "job-import" ? (
             <JobImport
               provider={ai.label}
+              ai={ai.status}
               request={(path, value, signal) =>
                 ws.request(path, { body: value, signal })
               }
@@ -282,6 +286,7 @@ export default function Workspace() {
             <ResumeImport
               existing={ws.data.experience}
               provider={ai.label}
+              ai={ai.status}
               request={(source, signal) =>
                 ws.request("/api/resume/extract", { body: source, signal })
               }

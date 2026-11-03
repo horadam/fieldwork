@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
+import type { AiStatus } from "./hooks/use-ai-status";
+import { CostHint } from "./ui/cost-hint";
 import type { TabId } from "./shell/tabs";
 import { Dialog } from "./modals/dialog";
 import { ConfirmDeleteBody } from "./modals/confirm-delete";
@@ -49,9 +51,31 @@ type Props = {
   shellBusy: boolean;
   savingTask: string | null;
   provider: string;
+  ai?: AiStatus | null;
 };
 const message = (e: unknown, fallback: string) =>
   e instanceof Error ? e.message : fallback;
+// Roughly what plan generation sends: each job's description and latest
+// analysis, plus the experience bank.
+function sourceChars(workspace: Workspace, jobIds: string[]) {
+  return jobIds.reduce(
+    (n, id) => {
+      const job = workspace.jobs.find((j) => j.id === id);
+      const run = workspace.runs
+        .filter((r) => r.application_id === id && r.output)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+      return (
+        n +
+        (job?.jd.length ?? 0) +
+        (run ? JSON.stringify(run.output).length : 0)
+      );
+    },
+    workspace.experience.reduce(
+      (n, e) => n + e.title.length + e.body.length,
+      0,
+    ),
+  );
+}
 // Notes and scores save this long after the last keystroke.
 const AUTOSAVE_MS = 800;
 
@@ -573,6 +597,11 @@ export function PreparationWorkspace(props: Props) {
               >
                 Generate {plan ? "new version" : "preparation plan"}
               </button>
+              <CostHint
+                ai={props.ai ?? null}
+                step="preparation"
+                sourceChars={sourceChars(workspace, target.jobIds)}
+              />
             </details>
           </>
         )}

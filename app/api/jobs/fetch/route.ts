@@ -6,7 +6,9 @@ export const runtime = "nodejs";
 export const maxDuration = 20;
 export async function POST(req: NextRequest) {
   try {
-    await inferenceAccess(req);
+    // Never opened up by a visitor's key: any string would pass, making this
+    // server an open URL fetcher. Visitors without an account paste text.
+    await inferenceAccess(req, false, { allowUserKey: false });
     const { url } = z
       .object({ url: z.string().max(2048) })
       .parse(await body(req, 6000));
