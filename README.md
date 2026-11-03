@@ -45,7 +45,7 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-`.env.example` enables the local defaults; preserve any existing `.env.local` rather than overwriting it. The project's `.npmrc` points pnpm at a store in `../.pnpm-store`.
+`.env.example` enables the local defaults; preserve any existing `.env.local` rather than overwriting it.
 
 Open **http://127.0.0.1:3000**. The dev script binds to loopback. Existing `fieldwork-demo-v1` browser data is retained. The initial records are synthetic examples; replace them with your own user-confirmed experience. Browser records belong to that browser origin; localhost and 127.0.0.1 have separate storage.
 
@@ -170,7 +170,7 @@ pnpm test            # or pnpm test:coverage
 pnpm build
 ```
 
-`pnpm check` runs typecheck, tests and build. CI also runs `format:check` and coverage. Tests cover API routes, the shell and key views in jsdom, both SDK transports with mocked HTTP, provider and access boundaries, PDF parsing, retry safety, database transactions, RLS, capacity and quotas (PGlite), and the eval scorers. See [VERIFICATION.md](VERIFICATION.md) for the earlier execution record.
+`pnpm check` runs typecheck, tests and build. CI also runs `format:check` and coverage. Tests cover API routes, the shell and key views in jsdom, both SDK transports with mocked HTTP, provider and access boundaries, PDF parsing, retry safety, database transactions, RLS, capacity and quotas (PGlite), and the eval scorers.
 
 Labelled **synthetic** evals run against the configured provider, one call at a time:
 

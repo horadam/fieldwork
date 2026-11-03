@@ -2,7 +2,7 @@
 
 These diagrams describe the current implementation as of **2026-11-02**. They
 are code-reading maps, not evidence that hosted Supabase or live model acceptance
-has passed. See [verification](../../VERIFICATION.md) for the execution record.
+has passed. See [eval results](../../evals/results.md) for measured model quality.
 
 Read the first three documents together, then follow the feature you are studying:
 

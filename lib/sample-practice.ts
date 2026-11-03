@@ -1,16 +1,16 @@
-// Sample general-practice content: the author's own interview preparation set,
-// shown when no preparation target is selected. Replace it with yours; nothing
-// here is generated or derived from the experience bank.
+// Sample general-practice content, shown when no preparation target is
+// selected. Replace it with your own; nothing here is generated or derived from
+// the experience bank.
 export const interviewQuestions = [
   {
     question: "Tell me about yourself and why this role interests you.",
     guidance:
-      "60–90 seconds: full-stack foundation → production AI work → why this role. Mention React/TypeScript/Node/AWS; connect to end-to-end AI delivery. Keep company-specific motivation truthful.",
+      "60–90 seconds: your background → the work most relevant to this role → why this role now. Keep company-specific motivation truthful.",
   },
   {
-    question: "Walk me through a user-facing LLM product you helped ship.",
+    question: "Walk me through a product or feature you helped ship.",
     guidance:
-      "Use the incident-response workflow: user problem, your exact contribution, structured collection, classification, routing, integrations, and observed outcome. Separate your work from team ownership.",
+      "User problem, your exact contribution, key decisions, and the observed outcome. Separate your work from the team's.",
   },
   {
     question:
@@ -19,9 +19,9 @@ export const interviewQuestions = [
       "Pick one actual decision. Explain constraints, your recommendation, the alternative, who decided, and what happened. Do not substitute a hypothetical design for past experience.",
   },
   {
-    question: "How did you know the AI quality improved?",
+    question: "How did you know your work made things better?",
     guidance:
-      "Define the metric, baseline, period, sample, and your contribution. Explain what was observed versus causally established. If you cannot substantiate the ~20% figure, qualify it.",
+      "Define the metric, baseline, period, sample, and your contribution. Explain what was observed versus causally established, and qualify any number you cannot substantiate.",
   },
   {
     question: "Describe a feature you delivered across frontend and backend.",
@@ -34,15 +34,14 @@ export const interviewQuestions = [
       "Use a real example: clarify the user outcome, test a risky assumption, ship a small slice, and use feedback. Include a concrete decision.",
   },
   {
-    question: "How comfortable are you with Next.js, Postgres, and Supabase?",
+    question: "How comfortable are you with the tools in this stack?",
     guidance:
-      "Lead with React/TypeScript strength and backend/SQL experience. State honestly that Next.js and Supabase are refresh areas. Explain transferable concepts and current practice.",
+      "Lead with your strongest matching skills. Name the gaps honestly as refresh areas, and explain the transferable concepts and what you are practicing now.",
   },
   {
-    question:
-      "What startup experience demonstrates speed, ownership, and judgment?",
+    question: "What experience demonstrates speed, ownership, and judgment?",
     guidance:
-      "Describe actual product context, pace, scope, and customer impact. Do not invent employer growth metrics or claim all employers were high-growth SaaS startups.",
+      "Describe the actual context, pace, scope, and impact. Do not invent metrics or overstate the size of your role.",
   },
 ];
 export const weeks = [
@@ -119,7 +118,7 @@ export const overviewSteps = [
   },
   {
     title: "Know your gaps",
-    detail: "Review Next.js, Supabase, and the server-to-database path.",
+    detail: "List the job requirements you cannot yet back with evidence.",
     target: "study",
   },
   {
@@ -130,7 +129,7 @@ export const overviewSteps = [
 ] as const;
 export const prepAgenda = [
   ["20 min", "Introduction and motivation"],
-  ["45 min", "Two real AI product stories"],
+  ["45 min", "Two real project stories"],
   ["30 min", "Eight likely questions"],
   ["20 min", "Stack and evaluation refresh"],
   ["25 min", "Mock interview and retry"],
