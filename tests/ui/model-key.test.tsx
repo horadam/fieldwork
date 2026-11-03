@@ -134,13 +134,38 @@ describe("API client", () => {
 });
 
 describe("model key panel", () => {
-  it("saves a key, shows only its last four characters, and forgets it", () => {
+  // The models route answers for the key being checked.
+  function models(
+    body: unknown = {
+      priced: ["gpt-6-luna", "gpt-6.1-terra", "gpt-6-astra"],
+      unpriced: ["gpt-7-preview"],
+    },
+    status = 200,
+  ) {
+    const fetcher = vi.fn(async (_url: string, _init: RequestInit) =>
+      Response.json(body, { status }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    return fetcher;
+  }
+  async function checkKey(value = key) {
     render(<ModelKey />);
     fireEvent.click(
       screen.getByRole("button", { name: "Use your own OpenAI key" }),
     );
     fireEvent.change(screen.getByLabelText("OpenAI API key"), {
-      target: { value: key },
+      target: { value },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check key" }));
+  }
+
+  it("checks the key, then saves it showing only its last four characters", async () => {
+    const fetcher = models();
+    await checkKey();
+    await screen.findByLabelText("Model");
+    expect(fetcher.mock.calls[0][0]).toBe("/api/ai/models");
+    expect(fetcher.mock.calls[0][1]!.headers).toMatchObject({
+      "x-openai-key": key,
     });
     fireEvent.click(screen.getByRole("button", { name: "Use this key" }));
     expect(screen.getByText(/is in use/).textContent).toContain(
@@ -149,6 +174,54 @@ describe("model key panel", () => {
     expect(document.body.textContent).not.toContain(key);
     fireEvent.click(screen.getByRole("button", { name: "Forget key" }));
     expect(screen.getByRole("button", { name: "Use your own OpenAI key" }));
+  });
+
+  it("offers only the key's priced models, with the suggestion selected", async () => {
+    models();
+    await checkKey();
+    const select = (await screen.findByLabelText("Model")) as HTMLSelectElement;
+    expect([...select.options].map((o) => o.value)).toEqual([
+      "gpt-6-luna",
+      "gpt-6.1-terra",
+      "gpt-6-astra",
+    ]);
+    expect(select.selectedOptions[0].textContent).toBe(
+      "gpt-6.1-terra · $1.00 / $5.00 · suggested",
+    );
+    expect(document.body.textContent).toContain(
+      "no price for them yet: gpt-7-preview",
+    );
+    fireEvent.change(select, { target: { value: "gpt-6-luna" } });
+    fireEvent.click(screen.getByRole("button", { name: "Use this key" }));
+    expect(getUserKeyState().userKey?.model).toBe("gpt-6-luna");
+  });
+
+  it("explains a key with no priced models and doesn't save it", async () => {
+    models({ priced: [], unpriced: ["gpt-7-preview"] });
+    await checkKey();
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "can't use any model this app has a price for",
+    );
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Use this key",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(getUserKeyState().userKey).toBeNull();
+  });
+
+  it("shows a rejected key before any billed call", async () => {
+    models(
+      { error: "OpenAI rejected your API key.", code: "openai_key_rejected" },
+      400,
+    );
+    await checkKey();
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "rejected your API key",
+    );
+    expect(getUserKeyState().userKey).toBeNull();
   });
 
   it("recommends a limited, revocable key", () => {
@@ -172,7 +245,7 @@ describe("model key panel", () => {
     fireEvent.change(screen.getByLabelText("OpenAI API key"), {
       target: { value: "hello" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Use this key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check key" }));
     expect(screen.getByRole("alert").textContent).toContain("sk-");
     expect(getUserKeyState().userKey).toBeNull();
   });

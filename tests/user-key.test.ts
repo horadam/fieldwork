@@ -16,6 +16,7 @@ import { failure, inferenceAccess, reserveInference } from "../lib/server";
 import { POST as extractResume } from "../app/api/resume/extract/route";
 import { POST as fetchJob } from "../app/api/jobs/fetch/route";
 import { GET as status } from "../app/api/ai/status/route";
+import { GET as listModels } from "../app/api/ai/models/route";
 
 const key = "sk-test_" + "a".repeat(40);
 const hosted = (path: string, headers: Record<string, string> = {}) =>
@@ -197,5 +198,66 @@ describe("hosted access with a visitor's key", () => {
       code: "inference_timeout",
       usage: { inputTokens: 1200, model: "gpt-6.1-terra" },
     });
+  });
+});
+
+describe("listing a visitor's models", () => {
+  const get = (headers: Record<string, string> = withKey) =>
+    listModels(
+      new NextRequest("https://fieldwork.vercel.app/api/ai/models", {
+        headers,
+      }),
+    );
+  const openai = (body: unknown, status = 200) => {
+    const fetcher = vi.fn(async (_url: string, _init: RequestInit) =>
+      Response.json(body, { status }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    return fetcher;
+  };
+
+  it("returns the key's priced models cheapest first", async () => {
+    const fetcher = openai({
+      object: "list",
+      data: [
+        "gpt-6-astra",
+        "gpt-6-luna",
+        "gpt-7-preview",
+        "text-embedding-3-small",
+        "gpt-4o-2024-08-06",
+      ].map((id) => ({ id, object: "model", created: 0, owned_by: "openai" })),
+    });
+    const response = await get();
+    expect(await response.json()).toEqual({
+      priced: ["gpt-6-luna", "gpt-6-astra"],
+      unpriced: ["gpt-7-preview"],
+    });
+    expect(String(fetcher.mock.calls[0][0])).toBe(
+      "https://api.openai.com/v1/models",
+    );
+  });
+
+  it.each([
+    [401, "openai_key_rejected"],
+    [403, "openai_models_forbidden"],
+  ])("explains HTTP %i without echoing the key", async (httpStatus, code) => {
+    openai({ error: { message: `Bad key ${key}` } }, httpStatus);
+    const body = await (await get()).json();
+    expect(body.code).toBe(code);
+    expect(JSON.stringify(body)).not.toContain(key);
+  });
+
+  it("needs a key", async () => {
+    const response = await get({});
+    expect(response.status).toBe(400);
+    expect((await response.json()).code).toBe("user_key_missing");
+  });
+
+  it("refuses unpriced models on a visitor's key", () => {
+    expect(() =>
+      requestProvider(
+        new Headers({ "x-openai-key": key, "x-openai-model": "gpt-7-preview" }),
+      ),
+    ).toThrow(expect.objectContaining({ code: "user_model_unpriced" }));
   });
 });

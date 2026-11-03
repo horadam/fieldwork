@@ -19,7 +19,7 @@ flowchart LR
 - **Nothing the model says is trusted by default.** Output is validated with Zod, and every evidence and requirement ID is checked against the inputs. Drafts stay drafts until you confirm them.
 - **Runs locally or hosted.** Local Ollama (`qwen3:8b`) is the default, and OpenAI is an option. Storage is either your browser or a Supabase account protected by row-level security. Storage and model choice are independent.
 - **Engineered for failure.** Every model call has a deadline, makes exactly one attempt and has no fallback. Errors are sanitized. Duration and tokens are recorded even when a call fails. Retries are idempotent, and the hosted plan has hourly quotas.
-- **Measured.** 393 tests cover routes, UI, Postgres RLS (in PGlite), SSRF-safe fetching and the security headers. Labelled evals cover resume, job and plan generation; see [the results and known weaknesses](evals/results.md).
+- **Measured.** 401 tests cover routes, UI, Postgres RLS (in PGlite), SSRF-safe fetching and the security headers. Labelled evals cover resume, job and plan generation; see [the results and known weaknesses](evals/results.md).
 
 For a code-guided walkthrough with diagrams, start with the [architecture and flow index](docs/architecture/README.md).
 
@@ -136,7 +136,7 @@ Use a model supporting structured output and function tools. OpenAI usage is bil
 
 ## Use your own OpenAI key
 
-On a hosted copy, visitors without an account can run every AI step on their own OpenAI key. Open the model status in the header, choose **Use your own OpenAI key**, paste the key and pick a model (default `gpt-6.1-terra`; it must support structured outputs).
+On a hosted copy, visitors without an account can run every AI step on their own OpenAI key. Open the model status in the header, choose **Use your own OpenAI key**, paste the key and choose **Check key**. The app lists the key's models through OpenAI's free `GET /v1/models`, so a wrong or restricted key is caught before any billed call. The visitor then picks from the models that key can use **and** that the app has a price for, cheapest first (`gpt-6.1-terra` is suggested). A visitor's key can only run priced models, so every call shows its cost; models the key has but the price table doesn't cover are named, not offered. Prices stay in a dated table because OpenAI has no prices API.
 
 - **Where the key goes.** It is kept in this browser: in `sessionStorage` until the tab closes, or in `localStorage` with **Remember on this device**. **Forget key** removes it. It is sent to this app's own API routes in an `x-openai-key` header with each AI request, used for that one OpenAI call, and never stored, logged or returned. The server's config object holds it as a non-enumerable field, so it cannot leak into a response or stored record.
 - **What it unlocks.** Resume import, job extraction from pasted text, fit analysis and plan generation. Importing a job **from a URL** still needs an account, since any string would pass as a key and turn the server into an open URL fetcher. Calls on a visitor's key don't count against the hosted hourly quotas.

@@ -3,6 +3,7 @@ import type { CallRecord } from "./pricing";
 import {
   getUserKey,
   recordUsage,
+  type UserKey,
   USER_KEY_HEADER,
   USER_MODEL_HEADER,
 } from "./user-key";
@@ -19,7 +20,13 @@ export class ApiError extends Error {
 
 export type Request = <T = unknown>(
   path: string,
-  options?: { body?: unknown; token?: string; signal?: AbortSignal },
+  options?: {
+    body?: unknown;
+    token?: string;
+    signal?: AbortSignal;
+    // A key to try before it is saved, e.g. while listing its models.
+    userKey?: UserKey;
+  },
 ) => Promise<T>;
 
 // Model calls report usage as `metadata` (extraction and plans), `usage`
@@ -49,7 +56,7 @@ export function usageFrom(body: unknown): CallRecord | null {
 export function apiClient(token: () => string): Request {
   return async (path, options = {}) => {
     const bearer = options.token ?? token();
-    const userKey = getUserKey();
+    const userKey = options.userKey ?? getUserKey();
     const response = await fetch(path, {
       signal: options.signal,
       method: options.body === undefined ? "GET" : "POST",

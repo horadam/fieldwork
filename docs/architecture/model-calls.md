@@ -54,7 +54,11 @@ flowchart TB
 `requestProvider(headers)` turns `x-openai-key` and `x-openai-model` into an
 OpenAI config for that request. The key is a non-enumerable field, so spreading
 or serializing the config never includes it, and `openAIClient()` prefers it to
-`OPENAI_API_KEY`. Status reports "your key" without a test call. Calls on a
+`OPENAI_API_KEY`. A visitor's key may only run models in the price table
+(`user_model_unpriced` otherwise). `GET /api/ai/models` lists the key's models
+through OpenAI's free models endpoint, which checks the key before any billed
+call and limits the model menu to priced models that key can use. Status
+reports "your key" without a test call. Calls on a
 visitor's key skip the hosted quota. URL fetching (`/api/jobs/fetch`) is never
 opened by a key.
 

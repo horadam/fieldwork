@@ -1,11 +1,11 @@
 "use client";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useMemo, useState, type FormEvent } from "react";
+import { apiClient } from "@/lib/api-client";
 import {
   DEFAULT_USER_MODEL,
   KEYS_URL,
   formatCost,
   modelPrice,
-  PRICED_MODELS,
   PRICES_AS_OF,
   PRICING_URL,
   USAGE_URL,
@@ -58,25 +58,69 @@ export function SessionTotal({ usage }: { usage: SessionUsage }) {
   );
 }
 
-// Lets a visitor run AI steps on their own OpenAI key, kept in this browser.
+type Models = { priced: string[]; unpriced: string[] };
+const keyPattern = /^sk-[A-Za-z0-9_-]{20,300}$/;
+
+/**
+ * Lets a visitor run AI steps on their own OpenAI key, kept in this browser.
+ * The key is checked first by listing its models (free), and the visitor then
+ * picks from the models that key can use and whose price the app knows.
+ */
 export function ModelKey() {
   const { userKey, remember } = useUserKeyState();
   const [editing, setEditing] = useState(false);
-  const [invalid, setInvalid] = useState("");
+  const [problem, setProblem] = useState("");
+  const [checking, setChecking] = useState(false);
+  // The key that was checked and the models it can use.
+  const [checked, setChecked] = useState<{
+    key: string;
+    models: Models;
+  } | null>(null);
+  const [choice, setChoice] = useState("");
+  const request = useMemo(() => apiClient(() => ""), []);
   const id = useId();
+
+  function close() {
+    setProblem("");
+    setChecked(null);
+    setEditing(false);
+  }
+
+  async function check(key: string) {
+    if (!keyPattern.test(key))
+      return setProblem("Paste an OpenAI API key; it starts with sk-.");
+    setChecking(true);
+    setProblem("");
+    try {
+      const models = await request<Models>("/api/ai/models", {
+        userKey: { key, model: DEFAULT_USER_MODEL },
+      });
+      setChecked({ key, models });
+      const preferred = [userKey?.model, DEFAULT_USER_MODEL].find(
+        (m) => m && models.priced.includes(m),
+      );
+      setChoice(preferred ?? models.priced[0] ?? "");
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Could not check the key.");
+    } finally {
+      setChecking(false);
+    }
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const fields = new FormData(event.currentTarget);
-    const key = String(fields.get("key") || "").trim();
-    const model = String(fields.get("model") || "").trim();
-    if (!/^sk-[A-Za-z0-9_-]{20,300}$/.test(key))
-      return setInvalid("Paste an OpenAI API key; it starts with sk-.");
-    if (!/^[a-z0-9][a-z0-9._:-]{0,63}$/i.test(model))
-      return setInvalid("Enter an OpenAI model name, such as gpt-6.1-terra.");
-    saveUserKey({ key, model }, fields.get("remember") === "on");
-    setInvalid("");
-    setEditing(false);
+    if (!checked) {
+      // A blank field while changing settings keeps the saved key.
+      const typed = String(fields.get("key") || "").trim();
+      return void check(typed || userKey?.key || "");
+    }
+    if (!choice) return;
+    saveUserKey(
+      { key: checked.key, model: choice },
+      fields.get("remember") === "on",
+    );
+    close();
   }
 
   if (!editing)
@@ -124,9 +168,9 @@ export function ModelKey() {
           OpenAI API keys
         </a>
       </p>
-      {invalid && (
+      {problem && (
         <p role="alert" className="notice error">
-          {invalid}
+          {problem}
         </p>
       )}
       <label>
@@ -136,40 +180,69 @@ export function ModelKey() {
           type="password"
           autoComplete="off"
           spellCheck={false}
-          required
-          placeholder="sk-…"
+          required={!userKey}
+          disabled={checking}
+          onChange={() => setChecked(null)}
+          placeholder={
+            userKey ? `…${userKey.key.slice(-4)} (leave blank to keep)` : "sk-…"
+          }
         />
       </label>
-      <label>
-        Model
-        <input
-          name="model"
-          list={`${id}-models`}
-          defaultValue={userKey?.model || DEFAULT_USER_MODEL}
-          spellCheck={false}
-          required
-        />
-        <datalist id={`${id}-models`}>
-          {PRICED_MODELS.map((m) => (
-            <option key={m} value={m} />
-          ))}
-        </datalist>
-      </label>
-      <label className="inline">
-        <input type="checkbox" name="remember" defaultChecked={remember} />
-        Remember on this device
-      </label>
+      {checked &&
+        (checked.models.priced.length ? (
+          <>
+            <label>
+              Model
+              <select
+                value={choice}
+                onChange={(e) => setChoice(e.target.value)}
+                aria-describedby={`${id}-prices`}
+              >
+                {checked.models.priced.map((model) => {
+                  const price = modelPrice("openai", model)!;
+                  return (
+                    <option key={model} value={model}>
+                      {model} · {perMillion(price.input)} /{" "}
+                      {perMillion(price.output)}
+                      {model === DEFAULT_USER_MODEL ? " · suggested" : ""}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+            <p className="tiny muted" id={`${id}-prices`}>
+              The models this key can use, cheapest first. Prices are per 1M
+              input / output tokens, as of {PRICES_AS_OF}.
+              {checked.models.unpriced.length > 0 &&
+                ` Not listed because this app has no price for them yet: ${checked.models.unpriced.join(", ")}.`}
+            </p>
+            <label className="inline">
+              <input
+                type="checkbox"
+                name="remember"
+                defaultChecked={remember}
+              />
+              Remember on this device
+            </label>
+          </>
+        ) : (
+          <p role="alert" className="notice error">
+            This key works, but it can&apos;t use any model this app has a price
+            for. Check the key&apos;s project and model access.
+          </p>
+        ))}
       <div className="actions">
-        <button className="button small" type="submit">
-          Use this key
+        <button
+          className="button small"
+          type="submit"
+          disabled={checking || (!!checked && !checked.models.priced.length)}
+        >
+          {checking ? "Checking…" : checked ? "Use this key" : "Check key"}
         </button>
         <button
           className="button secondary small"
           type="button"
-          onClick={() => {
-            setInvalid("");
-            setEditing(false);
-          }}
+          onClick={close}
         >
           Cancel
         </button>

@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { DEFAULT_USER_MODEL } from "./pricing";
+import { DEFAULT_USER_MODEL, modelPrice, PRICED_MODELS } from "./pricing";
 import { USER_KEY_HEADER, USER_MODEL_HEADER } from "./user-key";
 import {
   OpenAIChatCompletionsModel,
@@ -79,9 +79,53 @@ export function requestProvider(headers: Headers): Provider {
       "user_model_invalid",
       400,
     );
+  // A visitor's key may only run models whose cost the app can show.
+  if (!modelPrice("openai", model))
+    throw new AIError(
+      `${model} isn't in this app's price list, so its cost can't be shown. Choose a listed model in the model panel.`,
+      "user_model_unpriced",
+      400,
+    );
   const config: Provider = { provider: "openai", model, deadlineMs: 45000 };
   Object.defineProperty(config, "apiKey", { value: key, enumerable: false });
   return config;
+}
+
+/**
+ * The priced models a visitor's key can use, cheapest first, plus the chat
+ * models it has that the price list doesn't cover yet. Listing models is
+ * free, so this also checks the key before any billed call.
+ */
+export async function availableModels(config: Provider, signal?: AbortSignal) {
+  const deadline = AbortSignal.timeout(10000);
+  let ids: string[];
+  try {
+    const page = await openAIClient(config).models.list({
+      signal: signal ? AbortSignal.any([deadline, signal]) : deadline,
+      maxRetries: 0,
+    });
+    ids = page.data.map((m) => m.id);
+  } catch (error) {
+    // Restricted project keys may lack the Models permission.
+    if ((error as { status?: number } | null)?.status === 403)
+      throw new AIError(
+        "This key can't list models. In OpenAI's key settings, give it read access to Models, or use a key with all permissions.",
+        "openai_models_forbidden",
+        400,
+      );
+    throw providerError(config, error);
+  }
+  const available = new Set(ids);
+  const priced = PRICED_MODELS.filter((m) => available.has(m)).sort((a, b) => {
+    const pa = modelPrice("openai", a)!,
+      pb = modelPrice("openai", b)!;
+    return pa.output - pb.output || pa.input - pb.input;
+  });
+  const unpriced = ids
+    .filter((id) => /^(gpt-|o\d)/.test(id) && !modelPrice("openai", id))
+    .sort()
+    .slice(0, 10);
+  return { priced, unpriced };
 }
 
 export function openAIClient(config: Provider) {
