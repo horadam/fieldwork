@@ -1128,26 +1128,6 @@ footer {
   margin: 6px 0 0;
   white-space: pre-wrap;
 }
-.approve-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  border-radius: 8px;
-  background: var(--paper);
-}
-.approve-bar p {
-  margin: 0;
-  color: #4a514a;
-}
-.plan-questions {
-  margin: 0;
-  padding-left: 20px;
-  display: grid;
-  gap: 8px;
-}
 @media (max-width: 1000px) {
   .apps {
     grid-template-columns: 1fr;

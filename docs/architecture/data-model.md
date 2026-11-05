@@ -117,8 +117,10 @@ self-scores and completion live separately in progress keyed by item IDs. SQL
 owns/version-links these rows; the API validates their JSON item references.
 
 The earlier `preparation_tasks` table is a different mechanism: approving an
-analysis inserts tasks by `(run_id, ordinal)`. Those rows are not the activities
-inside a newer preparation plan and are excluded from its time budget.
+analysis inserted tasks by `(run_id, ordinal)`. The app no longer creates these
+rows (approval was retired on 2026-11-05), but existing ones stay readable and
+can still be ticked off. They are not the activities inside a preparation plan
+and are excluded from its time budget.
 
 ## Deletion and retry behavior
 

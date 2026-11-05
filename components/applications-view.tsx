@@ -8,6 +8,7 @@ import {
   type Workspace as Data,
 } from "@/lib/domain";
 import { usageLabel } from "@/lib/pricing";
+import type { PlanSummary } from "@/lib/preparation-plan";
 import { signupsOpen } from "@/lib/deployment";
 import type { AiStatus } from "./hooks/use-ai-status";
 import { CostHint } from "./ui/cost-hint";
@@ -177,7 +178,8 @@ export function ApplicationsView({
   onPrepare,
   onEdit,
   onDelete,
-  onApprove,
+  onOpenTarget,
+  preparation = [],
   onAdd,
 }: {
   workspace: Data;
@@ -192,7 +194,10 @@ export function ApplicationsView({
   onPrepare: (job: Job) => void;
   onEdit: (job: Job) => void;
   onDelete: (job: Job) => void;
-  onApprove: (run: Run) => void;
+  // Opens a preparation target from the Prep plan tab.
+  onOpenTarget: (targetId: string) => void;
+  // Each preparation target's plan state, reported by the preparation workspace.
+  preparation?: PlanSummary[];
   onAdd: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -239,7 +244,6 @@ export function ApplicationsView({
 
   const runs = job ? runsFor(job.id) : [];
   const run = pinned?.application_id === job?.id ? pinned : runs[0];
-  const approved = !!run && workspace.tasks.some((t) => t.run_id === run.id);
   const running = !!job && runningJob === job.id;
 
   function selectJob(id: string) {
@@ -270,26 +274,6 @@ export function ApplicationsView({
           ? "Re-run fit analysis"
           : "Analyze fit"}
     </button>
-  );
-
-  // Shown only on the Prep plan tab, below the questions and tasks it approves.
-  const approveBar = run?.output && (
-    <div className="approve-bar">
-      <p className="tiny">
-        {approved
-          ? "Plan approved. Its tasks are in Preparation tasks."
-          : `Draft plan: ${run.output.questions.length} questions, ${run.output.tasks.length} study tasks. Nothing is saved until you approve.`}
-      </p>
-      <div className="actions">
-        <button
-          className="button accent"
-          disabled={busy || approved}
-          onClick={() => onApprove(run)}
-        >
-          {approved ? "Plan approved" : "Approve plan"}
-        </button>
-      </div>
-    </div>
   );
 
   return (
@@ -469,39 +453,73 @@ export function ApplicationsView({
               </>
             )}
 
-            {section === "plan" &&
-              (run?.output ? (
-                <>
-                  <h3>Interview questions</h3>
-                  <ol className="plan-questions">
-                    {run.output.questions.map((q, i) => (
-                      <li key={i}>{q.text}</li>
-                    ))}
-                  </ol>
-                  <h3>Proposed study tasks</h3>
-                  {run.output.tasks.map((t, i) => (
-                    <div className="list-row" key={i}>
-                      <span className="index">{i + 1}</span>
-                      <div className="grow">
-                        <strong>{t.title}</strong>
-                        <p className="tiny muted">{t.detail}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {approveBar}
-                </>
-              ) : (
-                <div className="empty slim">
-                  <h3>No plan yet.</h3>
-                  <p className="tiny muted">
-                    A fit analysis drafts interview questions and study tasks
-                    for you to review.
-                  </p>
-                </div>
-              ))}
+            {section === "plan" && (
+              <PrepPlan
+                summaries={preparation.filter((t) => t.jobIds.includes(job.id))}
+                hasRealAnalysis={runs.some(
+                  (r) => r.status === "completed" && !isSimulated(r),
+                )}
+                busy={busy}
+                onPrepare={() => onPrepare(job)}
+                onOpenTarget={onOpenTarget}
+              />
+            )}
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+// This job's preparation plans, from "Prepare for this job". Analyses no
+// longer carry a separately approved plan.
+function PrepPlan({
+  summaries,
+  hasRealAnalysis,
+  busy,
+  onPrepare,
+  onOpenTarget,
+}: {
+  summaries: PlanSummary[];
+  hasRealAnalysis: boolean;
+  busy: boolean;
+  onPrepare: () => void;
+  onOpenTarget: (targetId: string) => void;
+}) {
+  if (!summaries.length)
+    return (
+      <div className="empty slim">
+        <h3>No preparation plan yet</h3>
+        <p className="tiny muted">
+          Prepare for this job turns its fit analysis into interview questions
+          and practice activities, scheduled around the time you have.
+          {!hasRealAnalysis && " It needs a completed real analysis first."}
+        </p>
+        <button className="button" disabled={busy} onClick={onPrepare}>
+          Prepare for this job
+        </button>
+      </div>
+    );
+  return (
+    <div>
+      {summaries.map((s) => (
+        <div className="list-row" key={s.targetId}>
+          <div className="grow">
+            <strong>{s.name}</strong>
+            <p className="tiny muted">
+              {s.plan
+                ? `Active plan from ${new Date(s.plan.createdAt).toLocaleDateString()} · ${s.plan.questions} questions · ${s.plan.remaining} of ${s.plan.scheduled} scheduled activities left`
+                : "No active plan yet. Generate and review one in Interview practice."}
+            </p>
+          </div>
+          <button
+            className="button secondary small"
+            onClick={() => onOpenTarget(s.targetId)}
+          >
+            Open preparation
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

@@ -23,6 +23,7 @@ import {
   emptyProgress,
   matchingRun,
   outdated,
+  planSummaries,
   schedulePlan,
   settingsSchema,
   sourceProblems,
@@ -35,6 +36,7 @@ import {
   type PreparationProgress,
   type PlanOutput,
   type PlanSettings,
+  type PlanSummary,
 } from "@/lib/preparation-plan";
 
 type Props = {
@@ -43,7 +45,11 @@ type Props = {
   token: string;
   scope: string;
   requestedJob: string | null;
+  // Opens an existing target, e.g. from an application's Prep plan tab.
+  requestedTarget: string | null;
   onRequestHandled: () => void;
+  // Reports each target's plan state for Applications and the Overview.
+  onSummaries: (summaries: PlanSummary[]) => void;
   onGeneralChange: (general: boolean) => void;
   analyze: (job: Job) => Promise<void>;
   toggleLegacy: (id: string, done: boolean) => Promise<void>;
@@ -267,6 +273,17 @@ export function PreparationWorkspace(props: Props) {
       handled.current = null;
     });
   }, [props.requestedJob, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (ready) props.onSummaries(planSummaries(state));
+  }, [state, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!ready || !props.requestedTarget) return;
+    const target = state.targets.find((t) => t.id === props.requestedTarget);
+    if (target) choose(target.id, target);
+    props.onRequestHandled();
+  }, [props.requestedTarget, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function choose(id: string, known?: PreparationTarget) {
     setSelected(id);

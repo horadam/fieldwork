@@ -10,7 +10,7 @@ the next state.
 
 ```mermaid
 flowchart LR
-  VIEWS["Views and dialogs"] -->|"save, remove, import, approve, toggle"| HOOK["useWorkspaceData()"]
+  VIEWS["Views and dialogs"] -->|"save, remove, import, toggle"| HOOK["useWorkspaceData()"]
   HOOK -->|"current state + operation"| STORE{"WorkspaceStore"}
   STORE -->|"signed out"| BROWSER["browserStore: write localStorage, then resolve"]
   STORE -->|"signed in"| ACCOUNT["accountStore: API write, then reload"]

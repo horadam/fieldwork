@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Fieldwork · Job Search Workspace
 
-Interview-prep workspace: resume import → experience bank → JD fit analysis → approved preparation plan. Storage (browser or Supabase) and inference (Ollama or OpenAI) are independent.
+Interview-prep workspace: resume import → experience bank → JD fit analysis → activated preparation plan. Storage (browser or Supabase) and inference (Ollama or OpenAI) are independent.
 
 ## Stack
 

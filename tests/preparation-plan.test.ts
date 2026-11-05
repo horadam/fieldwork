@@ -7,6 +7,7 @@ import {
   matchingRun,
   outdated,
   planSources,
+  planSummaries,
   schedulePlan,
   settingsSchema,
   sourceProblems,
@@ -305,5 +306,35 @@ describe("validation and version lifecycle", () => {
     const restored = JSON.parse(JSON.stringify(state));
     expect(validateVersion(restored.plans[0])).toEqual(plan);
     expect(validateProgress(restored.progress[0], plan).done.a1).toBe(true);
+  });
+});
+
+describe("plan summaries", () => {
+  it("report each target's active plan and the scheduled work left", async () => {
+    const plan = version(await planSources(target, workspace()));
+    const summaries = planSummaries({
+      targets: [{ ...target, activeVersionId: plan.id }],
+      plans: [plan],
+      progress: [{ ...emptyProgress(plan.id), done: { a1: true } }],
+    });
+    expect(summaries).toEqual([
+      {
+        targetId: target.id,
+        name: target.name,
+        jobIds: ["job-a"],
+        plan: {
+          createdAt: plan.createdAt,
+          questions: 1,
+          scheduled: 2,
+          remaining: 1,
+        },
+      },
+    ]);
+  });
+
+  it("report a target without an active plan", () => {
+    expect(
+      planSummaries({ ...emptyPreparation(), targets: [target] })[0].plan,
+    ).toBeNull();
   });
 });

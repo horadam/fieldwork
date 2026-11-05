@@ -10,7 +10,6 @@ vi.mock("../lib/agent", async (original) => ({
   analyze: mocks.analyze,
 }));
 import { POST as analyze } from "../app/api/analyze/route";
-import { POST as approve } from "../app/api/approve/route";
 import { AIError } from "../lib/ai-provider";
 const id = "4b8954ca-4e61-4a04-838e-f145ba73422b";
 const evidence = [{ id: "e1", title: "React", body: "Built React apps." }];
@@ -93,27 +92,4 @@ it("records the model's token usage when its output is rejected", async () => {
     p_input: 300,
     p_output_tokens: 90,
   });
-});
-it("rejects approval of a stored run that fails validation with 422", async () => {
-  const single = vi.fn(async () => ({
-    data: {
-      status: "completed",
-      output: {
-        ...output,
-        requirements: [{ ...output.requirements[0], evidenceIds: ["x"] }],
-      },
-      evidence_snapshot: evidence,
-    },
-    error: null,
-  }));
-  const rpc = vi.fn();
-  mocks.authenticated.mockResolvedValue({
-    db: {
-      rpc,
-      from: () => ({ select: () => ({ eq: () => ({ single }) }) }),
-    },
-  });
-  const response = await approve(req({ runId: id }));
-  expect(response.status).toBe(422);
-  expect(rpc).not.toHaveBeenCalled();
 });

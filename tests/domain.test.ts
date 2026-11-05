@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  approveLocal,
   demoAnalysis,
   fitCoverage,
   validateAnalysis,
@@ -69,33 +68,6 @@ describe("grounding contract", () => {
     const a = valid();
     a.requirements[0].requirement = "Rust";
     expect(validateAnalysis(a, seed.experience)).toBeTruthy();
-  });
-});
-describe("approval gate", () => {
-  const run: Run = {
-    id: "run1",
-    application_id: "demo-job",
-    status: "completed",
-    output: valid(),
-    error: null,
-    created_at: "2026-10-15",
-    prompt_version: "test",
-    model: "none",
-    duration_ms: 0,
-  };
-  it("creates tasks only on explicit approval", () => {
-    expect(seed.tasks).toHaveLength(0);
-    const next = approveLocal(seed, run);
-    expect(next.tasks).toHaveLength(1);
-    expect(seed.tasks).toHaveLength(0);
-  });
-  it("is idempotent on retry", () => {
-    const next = approveLocal(seed, run);
-    expect(approveLocal(next, run).tasks).toHaveLength(1);
-  });
-  it("rejects incomplete and failed runs", () => {
-    for (const status of ["pending", "running", "failed"] as const)
-      expect(() => approveLocal(seed, { ...run, status })).toThrow();
   });
 });
 describe("offline preview and evaluation dataset", () => {

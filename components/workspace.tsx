@@ -17,11 +17,12 @@ import { OverviewView } from "./views/overview-view";
 import { ExperienceView } from "./views/experience-view";
 import { GeneralPracticeView } from "./views/general-practice-view";
 import { GeneralStudyView, studyTotal } from "./views/general-study-view";
-import { ApprovedTasksView } from "./views/approved-tasks-view";
+import { EarlierTasksView } from "./views/earlier-tasks-view";
 import { useWorkspaceData } from "./hooks/use-workspace-data";
 import { useAiStatus } from "./hooks/use-ai-status";
 import { DemoNotice } from "./shell/demo-notice";
 import { signupsOpen } from "@/lib/deployment";
+import type { PlanSummary } from "@/lib/preparation-plan";
 import { useNavPreference } from "./hooks/use-nav-preference";
 import { usePracticeNotes } from "./hooks/use-practice-notes";
 
@@ -60,6 +61,10 @@ export default function Workspace() {
   const [statusOpen, setStatusOpen] = useState(false);
   const [generalPreparation, setGeneralPreparation] = useState(true);
   const [preparationJob, setPreparationJob] = useState<string | null>(null);
+  const [preparationTarget, setPreparationTarget] = useState<string | null>(
+    null,
+  );
+  const [planSummaries, setPlanSummaries] = useState<PlanSummary[]>([]);
   const heading = useRef<HTMLHeadingElement>(null);
   const navigated = useRef(false);
   const current = tabById(tab);
@@ -195,6 +200,7 @@ export default function Workspace() {
         {tab === "overview" && (
           <OverviewView
             data={ws.data}
+            planSummaries={planSummaries}
             studyDone={studyDone}
             studyTotal={studyTotal}
             onNavigate={navigate}
@@ -231,7 +237,11 @@ export default function Workspace() {
             onDelete={(job) =>
               open({ type: "delete", entity: "job", id: job.id })
             }
-            onApprove={ws.approve}
+            preparation={planSummaries}
+            onOpenTarget={(targetId) => {
+              setPreparationTarget(targetId);
+              navigate("practice");
+            }}
             onAdd={() => addRecord("job")}
           />
         )}
@@ -244,7 +254,12 @@ export default function Workspace() {
           token={ws.token}
           scope={ws.mode === "live" ? ws.email : "browser"}
           requestedJob={preparationJob}
-          onRequestHandled={() => setPreparationJob(null)}
+          requestedTarget={preparationTarget}
+          onRequestHandled={() => {
+            setPreparationJob(null);
+            setPreparationTarget(null);
+          }}
+          onSummaries={setPlanSummaries}
           onGeneralChange={setGeneralPreparation}
           analyze={(job) => ws.runJob(job, ai.status)}
           toggleLegacy={ws.toggleTask}
@@ -266,7 +281,7 @@ export default function Workspace() {
           <GeneralStudyView study={notes.study} setStudy={notes.setStudy} />
         )}
         {tab === "tasks" && generalPreparation && (
-          <ApprovedTasksView
+          <EarlierTasksView
             tasks={ws.data.tasks}
             savingTask={ws.savingTask}
             onToggle={ws.toggleTask}

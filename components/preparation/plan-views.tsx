@@ -172,7 +172,8 @@ function DeferredCoverage({
   );
 }
 
-// Tasks approved from earlier fit analyses of this target's jobs.
+// Tasks approved from fit analyses of this target's jobs, before plans
+// replaced approval.
 export function EarlierTasks({
   target,
   workspace,
@@ -190,17 +191,14 @@ export function EarlierTasks({
         run.id === task.run_id && target.jobIds.includes(run.application_id),
     ),
   );
+  // Approving analysis tasks was retired; earlier ones stay usable here.
+  if (!tasks.length) return null;
   return (
     <section className="card">
       <h3>Earlier analysis tasks</h3>
       <p className="tiny muted">
         These remain separate from plan scheduling totals.
       </p>
-      {!tasks.length && (
-        <p className="tiny muted">
-          None yet. Approve a fit analysis plan in Applications to add some.
-        </p>
-      )}
       {tasks.map((task) => (
         <label className="check" key={task.id}>
           <input

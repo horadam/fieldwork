@@ -2,7 +2,7 @@
 
 **Interview preparation grounded in your real experience.** Import your resume into an experience bank you confirm line by line. Then check each job description against it: every requirement is marked met, partial or gap, and linked to the evidence behind it. Finally, turn those gaps into a scheduled preparation plan you review before anything is saved.
 
-![Applications: a job list with fit coverage, requirement-by-requirement evidence, and an approve bar](docs/images/applications.jpg)
+![Applications: a job list with fit coverage and requirement-by-requirement evidence](docs/images/applications.jpg)
 
 ```mermaid
 flowchart LR
@@ -10,7 +10,6 @@ flowchart LR
   J["Job URL or text"] -->|"fetch, extract, confirm"| A["Applications"]
   B --> F["Fit analysis: met / partial / gap, with evidence IDs"]
   A --> F
-  F -->|"approve"| T["Tasks"]
   F -->|"generate, review, activate"| P["Preparation plan: questions, schedule, progress"]
 ```
 
@@ -86,13 +85,13 @@ For `jobs.gem.com/<board>/<job-id>` pages with insufficient HTML text, the impor
 
 Fetch/extraction endpoints use the existing authenticated or explicitly enabled development/loopback/same-origin access guard. Every redirect is checked; private/reserved addresses are denied and validated DNS is pinned to the connection. No browser cookies, session credentials, scripts, embedded resources or page links are loaded. No database migration is needed; both browser storage and Supabase use a stable creation ID to prevent duplicate applications on confirmation retries. A separate intentional import can still create another application.
 
-## Resume → evidence → JD → approved tasks
+## Resume → evidence → JD → preparation plan
 
 1. Open **Experience → Import resume**. Upload one text-based PDF (5 MB, ten pages), or paste up to 20,000 characters.
 2. Inspect the actual extracted text before sending it to the configured model. Compare columns, dates, missing pages and characters with the original. Switch to pasted text to correct parsing problems.
 3. Generate drafts. Review each role/project, edit the saved title/details and structured fields, and confirm that dates, metrics and ownership match your actual work. Missing fields stay empty. Resume citations and page matching are not requested or required.
 4. Select entries and confirm. Likely duplicates start deselected. Checking a duplicate explicitly imports a separate record; no merge/overwrite occurs. Selected entries and import metadata are saved; PDF files and complete extracted resumes are not stored. Cancel/reload discards unconfirmed drafts. A failed save retains drafts and stable confirmation identifiers for retry.
-5. Add a job under **Applications**, select it in the list, and choose **Analyze fit**. The **Fit analysis** tab shows requirement coverage (met / partial / gap) with the evidence behind each match; review it, then approve the plan from **Prep plan**. Generated tasks are proposals until approval. **Simulated preview** (in the ⋯ menu) is an explicit separate option that makes no model call.
+5. Add a job under **Applications**, select it in the list, and choose **Analyze fit**. The **Fit analysis** tab shows requirement coverage (met / partial / gap) with the evidence behind each match; then choose **Prepare for this job** (on the **Prep plan** tab or in the ⋯ menu) to build a preparation plan from it. **Simulated preview** (in the ⋯ menu) is an explicit separate option that makes no model call.
 
 The PDF is parsed in browser memory with the PDF.js compatibility ESM module and its same-origin worker. Only extracted text/page text is sent to the backend. Encrypted, malformed, scanned/empty, oversized, and partially unreadable documents get errors or warnings with a pasted-text fallback. OCR and DOCX are deferred. Multi-column ordering is not certified automatically.
 
@@ -106,7 +105,7 @@ Choose **Applications → ⋯ → Prepare for this job**, or open Interview prac
 2. Choose start date, **one week**, **two weeks**, or an interview date, and 0.5–40 hours/week. Defaults are today, one week and 12 hours/week. The interview day is included; partial weeks are prorated. Specific dates may be up to one year from the start.
 3. Choose **Generate preparation plan**. One structured provider call combines requirements, analysis questions/tasks and referenced experience into questions with suggested answer outlines and prioritized study/practice activities. No browsing, grading, tools, tracing, automatic retry, download or provider fallback occurs. The serialized model input is limited to 60,000 characters without silent truncation; narrow an oversized target or shorten experience and re-analyze.
 4. Review questions/outlines, edit activities and estimates (5–120 minutes), change priority, deselect activities, and adjust timing. The schedule recalculates locally without another inference call. Activities are allocated in priority order, preserving input order for ties; indivisible activities that cannot fit any weekly bucket go to **Deferred**. Uncovered requirements are visible.
-5. Choose **Activate plan**. Interview practice uses its questions and source evidence; written answers and self-review scores save automatically shortly after you stop typing. Study plan and Preparation tasks share the same completion records, including job/type/status task filters. Writing an answer does not complete a rehearsal. Deferred work is kept outside schedule totals. Earlier approved analysis tasks remain separate from the new schedule.
+5. Choose **Activate plan**. Interview practice uses its questions and source evidence; written answers and self-review scores save automatically shortly after you stop typing. Study plan and Preparation tasks share the same completion records, including job/type/status task filters. Writing an answer does not complete a rehearsal. Deferred work is kept outside schedule totals. Tasks approved from analyses before preparation plans replaced that step remain usable, separate from the schedule.
 
 Changing sources, target membership or timing never rewrites an active plan. Generate, review and activate a new version explicitly. Old versions retain their notes/scores/completion and are read-only; progress is not transferred automatically. Failed saves retain the review; activation retries do not duplicate versions or reset progress. Closing/reloading discards unactivated drafts and answer edits typed in the last moment before autosave. A target deletion removes its versions/progress, while deleting an application retains preparation snapshots and marks affected membership as needing repair.
 
@@ -132,7 +131,7 @@ OPENAI_API_KEY=your-server-key
 OPENAI_MODEL=your-account-model
 ```
 
-Use a model supporting structured output and function tools. OpenAI usage is billed to that key. No browser-visible server keys, automatic fallback, SDK retries, or model downloads are implemented. Local runs use a 180-second total deadline; OpenAI uses 45 seconds. JD analysis retains six turns, ten read-only tool executions, output validation and manual task approval. Ollama receives the validated JD/experience snapshot in its initial message, so a structured response without tool calls still has the selected data and exact evidence IDs. The same read-only tools remain available; tool execution is not guaranteed. Analysis errors distinguish timeout, invalid JSON/tool responses, schema/reference failures and the turn limit. Extraction uses one structured model call and no tools. Tracing is disabled. Extraction errors distinguish connection, model, timeout, JSON/schema failures without echoing model output. Provider errors are sanitized; resume/JD contents are not logged by the app.
+Use a model supporting structured output and function tools. OpenAI usage is billed to that key. No browser-visible server keys, automatic fallback, SDK retries, or model downloads are implemented. Local runs use a 180-second total deadline; OpenAI uses 45 seconds. JD analysis retains six turns, ten read-only tool executions, output validation, and a draft-until-activated preparation plan. Ollama receives the validated JD/experience snapshot in its initial message, so a structured response without tool calls still has the selected data and exact evidence IDs. The same read-only tools remain available; tool execution is not guaranteed. Analysis errors distinguish timeout, invalid JSON/tool responses, schema/reference failures and the turn limit. Extraction uses one structured model call and no tools. Tracing is disabled. Extraction errors distinguish connection, model, timeout, JSON/schema failures without echoing model output. Provider errors are sanitized; resume/JD contents are not logged by the app.
 
 ## Use your own OpenAI key
 
@@ -250,7 +249,7 @@ Hosted copies explain themselves. An **About this demo** notice (dismissible, re
 - `lib/user-key.ts`, `lib/pricing.ts`: a visitor's own OpenAI key, prices, cost ceilings and the session total.
 - `proxy.ts`, `lib/security-headers.ts`: the per-request Content-Security-Policy and the security headers on every response.
 - `components/workspace.tsx`: the shell. It uses `components/hooks/` (data, model status, practice notes, nav), `components/shell/`, `components/views/` and `components/modals/`.
-- `components/applications-view.tsx`: application list, fit analysis and plan approval.
+- `components/applications-view.tsx`: application list, fit analysis, and each job's preparation plan.
 - `components/preparation-workspace.tsx` and `components/preparation/`: targets, plan generation, review, practice, schedule and tasks.
 - `components/job-import.tsx`, `components/resume-import.tsx`: the import wizards.
 - `supabase/migrations/001–005`: tables, RLS, transactional RPCs and quotas.

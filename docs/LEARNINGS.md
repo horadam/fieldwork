@@ -14,6 +14,8 @@ Non-obvious things this project has taught its contributors, human or agent. Rea
 
 - **`NEXT_PUBLIC_` values are built into the page.** After changing them in Vercel, redeploy; existing deployments keep the old values. (2026-11-05)
 - **`next dev` reads header config only at startup.** Editing a file that `next.config.ts` imports (e.g. `lib/security-headers.ts`) doesn't apply until `next.config.ts` itself changes or the server restarts. (2026-11-03)
+- **After deleting a route, clear `.next/types`.** The generated route types still import the deleted file, and `pnpm check` runs typecheck before the build that would regenerate them, so it fails until `.next/types` is removed (it's gitignored; CI starts clean). (2026-11-05)
+- **A dev server started before a dependency upgrade keeps the old version.** Next's dev panel then shows "(stale)" and may report fixed advisories; restart `pnpm dev`. (2026-11-05)
 - **Next 16.4.0 builds abort with `SecurityFatalError`;** 16.4.1 is the first patched release. (2026-11-03)
 
 ## Supabase

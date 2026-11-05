@@ -17,7 +17,7 @@ flowchart LR
   Store --> Agent
   JD[Selected JD] --> Agent
   Agent --> Analysis[Requirements / citations / gaps]
-  Analysis --> Approval[Approve preparation tasks]
+  Analysis --> Plan[Generate, review and activate a preparation plan]
 ```
 
 Storage and inference are independent choices. Browser persistence can use actual local inference without authentication or Supabase, behind explicit development/loopback/same-origin checks. Hosted access uses Supabase authentication. Ollama is the default fixed-loopback provider; OpenAI uses the existing Agents SDK and remains a server-configured option for both workflows. There is no paid fallback.
@@ -30,7 +30,7 @@ The review interface exposes both structured fields and the title/details actual
 
 Confirmation uses stable batch/item identifiers. Browser persistence validates the whole selection before one write. Supabase validates through the API and inserts transactionally with per-user locks, ownership from auth.uid(), unique retry keys and a 50-entry database guard. A malformed entry or capacity failure rolls back the entire batch. Prior manual entries remain valid, and historical evidence snapshots remain intact.
 
-JD analysis keeps the two read-only retrieval tools, six-turn and ten-tool limits, schema/reference validation, sanitized failure states and task approval gate. Local and cloud transports have explicit deadlines and no SDK retries. Provider tracing is disabled. Simulated preview remains clearly labeled and separate from real inference.
+JD analysis keeps the two read-only retrieval tools, six-turn and ten-tool limits, schema/reference validation, sanitized failure states, and a preparation plan that stays a draft until activated. Local and cloud transports have explicit deadlines and no SDK retries. Provider tracing is disabled. Simulated preview remains clearly labeled and separate from real inference.
 
 ## Evidence and limits
 
@@ -50,4 +50,4 @@ Automated checks exercise both real SDK request paths using mocked HTTP, local a
 
 The synthetic extraction dataset defines expected role/organization/date fields plus cases for shared ownership, metrics, prompt injection and projects. The evaluation script records actual run outputs, field/count agreement, forbidden-phrase flags, latency and failures; semantic review is still required. Measured local results and open findings are in [evals/results.md](evals/results.md).
 
-The next evidence to collect is a successful local end-to-end run: synthetic PDF/text import, selected confirmation, persistence after reload, genuine local JD analysis, manual approval, and an Ollama-stop recovery check. Paid OpenAI comparisons are explicitly opt-in. Provider/model choice should follow those measurements.
+The next evidence to collect is a successful local end-to-end run: synthetic PDF/text import, selected confirmation, persistence after reload, genuine local JD analysis, plan activation, and an Ollama-stop recovery check. Paid OpenAI comparisons are explicitly opt-in. Provider/model choice should follow those measurements.
