@@ -133,6 +133,8 @@ export const versionSchema = z.object({
     // Optional: versions saved before usage was recorded lack them.
     inputTokens: z.number().int().nonnegative().optional(),
     outputTokens: z.number().int().nonnegative().optional(),
+    // Links removed from the model's reply before review.
+    repairs: z.array(text.max(300)).max(10).optional(),
   }),
 });
 export type PreparationPlanVersion = z.infer<typeof versionSchema>;
