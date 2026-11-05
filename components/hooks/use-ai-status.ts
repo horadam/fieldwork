@@ -14,6 +14,10 @@ export type AiStatus = {
   message: string;
   // "user" when the visitor's own OpenAI key is in use.
   source?: "user";
+  // False when this visitor may not run any model (no account or key).
+  allowed?: boolean;
+  // The account-less local development mode; false on hosted copies.
+  local?: boolean;
 };
 
 const serverSnapshot: UserKeyState = {

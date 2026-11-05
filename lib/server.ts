@@ -5,6 +5,7 @@ import {
   type Provider,
 } from "./ai-provider";
 import { supabaseConfig } from "./supabase-config";
+import { accessHint } from "./deployment";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 export class HttpError extends Error {
@@ -175,7 +176,7 @@ export async function inferenceAccess(
     throw new HttpError(
       403,
       (allowUserKey
-        ? "Sign in, or add your own OpenAI key in the model panel, to run AI steps here."
+        ? accessHint()
         : "Sign in to import jobs from a URL here, or paste the job text instead.") +
         " Local development without an account needs LOCAL_WORKSPACE_ENABLED=true, development mode, loopback hosting and a same-origin request.",
     );

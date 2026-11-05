@@ -1213,3 +1213,46 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* Explanation above the sign-in fields, spaced apart from them. */
+.auth-intro {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.auth-intro p {
+  margin: 0;
+}
+
+/* Explains a hosted copy to visitors; dismissible. */
+.demo-notice {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin: 18px 0 32px;
+  padding: 18px 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--green);
+  border-radius: 9px;
+}
+.demo-notice > div {
+  flex: 1;
+  display: grid;
+  gap: 8px;
+}
+.demo-notice h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.demo-notice p {
+  margin: 0;
+  max-width: 68ch;
+}
+.demo-notice .actions {
+  margin-top: 4px;
+}
+.demo-notice .icon-button {
+  width: 32px;
+  height: 32px;
+}

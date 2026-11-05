@@ -3,10 +3,13 @@ import { useRef, useState, type FormEvent } from "react";
 
 export function AuthFormBody({
   available,
+  signupsOpen = true,
   busy,
   onSubmit,
 }: {
   available: boolean;
+  // False on invite-only deployments: accounts are created by the owner.
+  signupsOpen?: boolean;
   busy: boolean;
   // Resolves to "confirm-email" when the account needs confirming first.
   onSubmit: (
@@ -40,11 +43,22 @@ export function AuthFormBody({
           {info}
         </div>
       )}
-      <p className="tiny muted">
-        {available
-          ? "Sign in or create an account. Email confirmation may be required."
-          : "Live sign-in is not configured. Use the browser workspace; setup instructions are included with the source."}
-      </p>
+      <div className="auth-intro">
+        <p className="tiny muted">
+          {!available
+            ? "Live sign-in is not configured. Use the browser workspace; setup instructions are included with the source."
+            : signupsOpen
+              ? "Sign in or create an account. Email confirmation may be required."
+              : "Accounts on this demo are invite-only. If you were given one, sign in below."}
+        </p>
+        {available && !signupsOpen && (
+          <p className="tiny muted">
+            Everything else works without an account: your records stay in this
+            browser, Simulated preview needs no model, and you can run AI steps
+            with your own OpenAI key from the model status in the header.
+          </p>
+        )}
+      </div>
       <form className="form" ref={form} onSubmit={submit}>
         <label>
           Email
@@ -64,16 +78,18 @@ export function AuthFormBody({
           <button disabled={busy || !available} className="button">
             Sign in
           </button>
-          <button
-            disabled={busy || !available}
-            type="button"
-            className="button secondary"
-            onClick={() => {
-              if (form.current!.reportValidity()) void send(true);
-            }}
-          >
-            Create account
-          </button>
+          {signupsOpen && (
+            <button
+              disabled={busy || !available}
+              type="button"
+              className="button secondary"
+              onClick={() => {
+                if (form.current!.reportValidity()) void send(true);
+              }}
+            >
+              Create account
+            </button>
+          )}
         </div>
       </form>
     </>

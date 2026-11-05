@@ -8,6 +8,7 @@ import {
   type Workspace as Data,
 } from "@/lib/domain";
 import { usageLabel } from "@/lib/pricing";
+import { signupsOpen } from "@/lib/deployment";
 import type { AiStatus } from "./hooks/use-ai-status";
 import { CostHint } from "./ui/cost-hint";
 
@@ -375,9 +376,11 @@ export function ApplicationsView({
           </div>
           {!aiReady ? (
             <p className="tiny muted">
-              Analysis needs a model. Sign in, or add your own OpenAI key from
-              the status in the header. You can also use a simulated preview
-              from the ⋯ menu.
+              Analysis needs a model.{" "}
+              {signupsOpen()
+                ? "Sign in, or add your own OpenAI key from the status in the header."
+                : "Add your own OpenAI key from the status in the header."}{" "}
+              You can also use a simulated preview from the ⋯ menu.
             </p>
           ) : (
             <CostHint
