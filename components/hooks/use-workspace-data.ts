@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   demoAnalysis,
   jobInput,
@@ -18,6 +18,7 @@ import {
   type RecordValue,
 } from "@/lib/store";
 import { supabaseConfig } from "@/lib/supabase-config";
+import { browserSupabase } from "@/lib/supabase-browser";
 import type { AiStatus } from "./use-ai-status";
 
 const empty: Data = { jobs: [], experience: [], runs: [], tasks: [] };
@@ -86,7 +87,7 @@ export function useWorkspaceData() {
       return;
     }
     if (!config) return;
-    const db = createClient(config.url, config.key);
+    const db = browserSupabase(config.url, config.key);
     setClient(db);
     const { data: listener } = db.auth.onAuthStateChange((_event, session) => {
       activeToken.current = session?.access_token || "";
