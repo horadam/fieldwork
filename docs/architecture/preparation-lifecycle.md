@@ -18,8 +18,8 @@ flowchart TD
   BUDGET["User chooses start, horizon/deadline and weekly hours"]
   GENERATE["User: Generate preparation plan"]
   API["Server: guard access and load/validate selected sources"]
-  AI["Separate structured AI call: questions, outlines, activities"]
-  VALIDATE["Server: validate schema and references"]
+  AI["Separate structured AI call: questions, outlines, activities; links limited to real keys"]
+  VALIDATE["Server: remove stray links (reported), then validate schema and references"]
   REVIEW["Browser memory: review and edit draft; select activities"]
   SCHEDULE["Browser TypeScript: deterministic weekly allocation"]
   DEFER["Show deferred work and uncovered requirements"]
@@ -83,6 +83,11 @@ block new activation; committed activation retries preserve existing records.
 
 ## Scheduling and progress
 
+- Links are constrained, then repaired. The model's output schema only accepts
+  link keys that exist (`jobId#requirementId`, cited `jobId#evidenceId`). Any link
+  that still doesn't resolve is removed, items left without a real requirement
+  are dropped, and the draft review lists each repair. A plan with no usable
+  question or activity is rejected with a specific reason.
 - Defaults: one week and 12 hours/week; users can choose two weeks or a specific
   inclusive interview date, with 0.5–40 hours/week. Partial weeks are prorated.
 - Activities are indivisible, estimated at 5–120 minutes, and allocated to the
@@ -113,6 +118,7 @@ versions and progress. See the [data model](data-model.md).
   [source validation, scheduling and local activation](../../lib/preparation-plan.ts).
 - [Generation route](../../app/api/preparation/generate/route.ts),
   [generation call](../../lib/preparation-generation.ts),
+  [link keys and repair](../../lib/plan-links.ts),
   [owned-source loading](../../lib/preparation-server.ts), and
   [account persistence route](../../app/api/preparation/route.ts).
 - [Transactional account storage](../../supabase/migrations/004_preparation_targets.sql).
