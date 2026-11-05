@@ -169,4 +169,25 @@ describe("draft review", () => {
       }),
     ).toBeTruthy();
   });
+
+  it("lists links removed from the model's reply", async () => {
+    const draft = version(await planSources(target, workspace()));
+    draft.metadata.repairs = [
+      "Removed 1 link to requirements that don't exist.",
+    ];
+    render(
+      <DraftReview
+        draft={draft}
+        busy={false}
+        onChange={() => {}}
+        onActivate={() => {}}
+        onDiscard={() => {}}
+      />,
+    );
+    const notice = screen.getByRole("status");
+    expect(notice.textContent).toContain("links were removed");
+    expect(notice.textContent).toContain(
+      "Removed 1 link to requirements that don't exist.",
+    );
+  });
 });
