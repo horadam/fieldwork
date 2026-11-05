@@ -80,6 +80,34 @@ describe("sign-in form", () => {
     );
     expect(screen.queryByRole("alert")).toBeNull();
   });
+
+  it("offers sign-in only on an invite-only deployment", async () => {
+    const onSubmit = vi.fn(async () => "signed-in" as const);
+    render(
+      <AuthFormBody
+        available
+        signupsOpen={false}
+        busy={false}
+        onSubmit={onSubmit}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Create account" })).toBeNull();
+    expect(document.body.textContent).toContain("invite-only");
+    expect(document.body.textContent).toContain("your own OpenAI key");
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "person@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "long-enough" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        { email: "person@example.com", password: "long-enough" },
+        false,
+      ),
+    );
+  });
 });
 
 describe("target editor", () => {

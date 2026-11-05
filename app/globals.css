@@ -1213,3 +1213,13 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* Explanation above the sign-in fields, spaced apart from them. */
+.auth-intro {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.auth-intro p {
+  margin: 0;
+}

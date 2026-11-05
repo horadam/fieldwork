@@ -296,6 +296,7 @@ export default function Workspace() {
           ) : modal.type === "auth" ? (
             <AuthFormBody
               available={ws.canSignIn}
+              signupsOpen={process.env.NEXT_PUBLIC_SIGNUPS !== "closed"}
               busy={ws.busy}
               onSubmit={async (credentials, signup) => {
                 const outcome = await ws.authenticate(credentials, signup);

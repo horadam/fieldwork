@@ -19,7 +19,7 @@ flowchart LR
 - **Nothing the model says is trusted by default.** Output is validated with Zod, and every evidence and requirement ID is checked against the inputs. Drafts stay drafts until you confirm them.
 - **Runs locally or hosted.** Local Ollama (`qwen3:8b`) is the default, and OpenAI is an option. Storage is either your browser or a Supabase account protected by row-level security. Storage and model choice are independent.
 - **Engineered for failure.** Every model call has a deadline, makes exactly one attempt and has no fallback. Errors are sanitized. Duration and tokens are recorded even when a call fails. Retries are idempotent, and the hosted plan has hourly quotas.
-- **Measured.** 401 tests cover routes, UI, Postgres RLS (in PGlite), SSRF-safe fetching and the security headers. Labelled evals cover resume, job and plan generation; see [the results and known weaknesses](evals/results.md).
+- **Measured.** 402 tests cover routes, UI, Postgres RLS (in PGlite), SSRF-safe fetching and the security headers. Labelled evals cover resume, job and plan generation; see [the results and known weaknesses](evals/results.md).
 
 For a code-guided walkthrough with diagrams, start with the [architecture and flow index](docs/architecture/README.md).
 
@@ -227,7 +227,16 @@ The JD comparison performs baseline and grounded runs across 20 cases, 40 model 
 
 ## Deploying
 
-Any Next.js host works with Supabase accounts and `AI_PROVIDER=openai`. A hosted server cannot reach a laptop's Ollama. Hosted AI steps need sign-in or the visitor's own OpenAI key; the local, account-less mode is refused outside loopback development. With no environment variables at all, a hosted copy still runs: browser storage, Simulated preview, and AI steps on visitors' own keys. Set the Supabase URL and publishable key, `OPENAI_API_KEY` and `OPENAI_MODEL` as server environment variables, apply migrations 001–005, and add the deployed URL to Supabase's redirect allowlist. No demo deployment is maintained.
+Any Next.js host works with Supabase accounts and `AI_PROVIDER=openai`. A hosted server cannot reach a laptop's Ollama. Hosted AI steps need sign-in or the visitor's own OpenAI key; the local, account-less mode is refused outside loopback development. With no environment variables at all, a hosted copy still runs: browser storage, Simulated preview, and AI steps on visitors' own keys. Set the Supabase URL and publishable key, `OPENAI_API_KEY` and `OPENAI_MODEL` as server environment variables, apply migrations 001–005, and add the deployed URL to Supabase's redirect allowlist. `NEXT_PUBLIC_` values are built into the page, so redeploy after changing them.
+
+### Public demo: invite-only accounts
+
+On a portfolio deployment, keep accounts invite-only. Open sign-up would store strangers' resumes, attract bot accounts, and hit the built-in Supabase mailer's limits; visitors don't need an account, because the browser workspace, Simulated preview and their own OpenAI key cover every flow.
+
+1. In Supabase, **Authentication → Sign In / Providers**: turn off **Allow new users to sign up**. This is what enforces invite-only; the app setting below only hides the button.
+2. In the host's environment variables, set `NEXT_PUBLIC_SIGNUPS=closed` and redeploy. The sign-in dialog then hides **Create account** and points visitors to the account-free options.
+3. To give someone an account, use **Authentication → Users → Add user → Create new user**, set a password and tick **Auto Confirm User**. Supabase's **Invite user** sends a magic link instead, and the app has no set-password screen, so invited users couldn't sign in with a password later.
+4. Leave `OPENAI_API_KEY` unset unless you want signed-in users to run on your key; if you set it, give its OpenAI project a monthly budget.
 
 ## Implementation map
 
