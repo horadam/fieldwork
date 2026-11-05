@@ -9,6 +9,8 @@ type Outcome = {
   inputTokens: number;
   outputTokens: number;
   error?: string;
+  // Fixed, content-free reason from the app's own error message.
+  reason?: string;
   score?: unknown;
 };
 
@@ -55,6 +57,7 @@ export async function runEval<C extends { id: string }>(
         inputTokens: usage?.inputTokens ?? 0,
         outputTokens: usage?.outputTokens ?? 0,
         error: error instanceof AIError ? error.code : "execution_failed",
+        reason: error instanceof AIError ? error.message : undefined,
       });
     }
     const last = outcomes.at(-1)!;

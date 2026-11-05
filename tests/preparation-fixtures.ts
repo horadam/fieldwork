@@ -97,6 +97,21 @@ export function output(): PlanOutput {
     ],
   };
 }
+// The same plan as the model returns it: links as "jobId#id" keys.
+export function modelReply(plan: PlanOutput = output()) {
+  return {
+    ...plan,
+    questions: plan.questions.map((q) => ({
+      ...q,
+      refs: q.refs.map((r) => `${r.jobId}#${r.requirementId}`),
+      evidenceRefs: q.evidenceRefs.map((e) => `${e.jobId}#${e.evidenceId}`),
+    })),
+    activities: plan.activities.map((a) => ({
+      ...a,
+      refs: a.refs.map((r) => `${r.jobId}#${r.requirementId}`),
+    })),
+  };
+}
 export const metadata = {
   provider: "ollama" as const,
   model: "qwen3:8b",

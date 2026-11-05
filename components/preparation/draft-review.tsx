@@ -72,6 +72,18 @@ export function DraftReview({
               outputTokens: draft.metadata.outputTokens,
             })}`}
         </p>
+        {!!draft.metadata.repairs?.length && (
+          <div className="notice" role="status">
+            <strong>Some of the model&apos;s links were removed.</strong> The
+            plan only keeps links to requirements and experience that exist, so
+            check that nothing important is missing.
+            <ul>
+              {draft.metadata.repairs.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <TimingFields
           value={draft.settings}
           onChange={(settings) => onChange({ ...draft, settings })}

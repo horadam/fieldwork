@@ -1,7 +1,13 @@
 import { afterEach, it, expect, vi } from "vitest";
 import { generatePreparation } from "../lib/preparation-generation";
 import { planSources } from "../lib/preparation-plan";
-import { target, workspace, output, settings } from "./preparation-fixtures";
+import {
+  target,
+  workspace,
+  output,
+  modelReply,
+  settings,
+} from "./preparation-fixtures";
 const config = {
   provider: "ollama" as const,
   model: "qwen3:8b",
@@ -15,7 +21,7 @@ it("uses one native local structured call with no tools, downloads, or cloud fal
   const sources = await planSources(target, workspace());
   const fetcher = vi.fn(async () =>
     Response.json({
-      message: { content: JSON.stringify(output()) },
+      message: { content: JSON.stringify(modelReply()) },
       done: true,
     }),
   );
@@ -53,8 +59,10 @@ it.each([
   "missing model",
 ])("fails on %s without retries or fallback", async (mode) => {
   const sources = await planSources(target, workspace());
-  const bad = output();
-  bad.questions[0].refs[0].jobId = "invented";
+  // Every link invented: nothing usable is left to repair.
+  const bad = modelReply();
+  for (const item of [...bad.questions, ...bad.activities])
+    item.refs = ["invented#r1"];
   const fetcher = vi.fn(async () => {
     if (mode === "offline") throw new Error("private diagnostic");
     if (mode === "missing model") return new Response("", { status: 404 });
@@ -119,7 +127,7 @@ it("preserves OpenAI as an explicit single structured-output request", async () 
         {
           index: 0,
           finish_reason: "stop",
-          message: { role: "assistant", content: JSON.stringify(output()) },
+          message: { role: "assistant", content: JSON.stringify(modelReply()) },
         },
       ],
     });
@@ -134,4 +142,45 @@ it("preserves OpenAI as an explicit single structured-output request", async () 
   expect(fetcher.mock.calls[0][0]).toBe(
     "https://api.openai.com/v1/chat/completions",
   );
+});
+it("sends the link keys and reports repairs with the draft", async () => {
+  const sources = await planSources(target, workspace());
+  const reply = modelReply();
+  reply.questions[0].evidenceRefs.push("job-a#e9");
+  const fetcher = vi.fn(async (_url: string, _init: RequestInit) =>
+    Response.json({ message: { content: JSON.stringify(reply) }, done: true }),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const result = await generatePreparation(sources, settings, config);
+  const user = JSON.parse(
+    JSON.parse(fetcher.mock.calls[0][1].body as string).messages[1].content,
+  );
+  expect(user.linkKeys.evidence).toEqual(["job-a#e1"]);
+  expect(result.output).toEqual(output());
+  expect(result.metadata.repairs).toEqual([
+    "Removed 1 experience link the analysis didn't cite for that job.",
+  ]);
+  expect(result.metadata.promptVersion).toBe("preparation-v2");
+});
+it("names the reason when a plan can't be used", async () => {
+  const sources = await planSources(target, workspace());
+  const reply = modelReply();
+  reply.questions[0].refs = ["invented#r1"];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        message: { content: JSON.stringify(reply) },
+        done: true,
+      }),
+    ),
+  );
+  await expect(
+    generatePreparation(sources, settings, config),
+  ).rejects.toMatchObject({
+    code: "preparation_invalid_output",
+    message: expect.stringContaining(
+      "no question was linked to a real requirement",
+    ),
+  });
 });
