@@ -261,3 +261,31 @@ describe("listing a visitor's models", () => {
     ).toThrow(expect.objectContaining({ code: "user_model_unpriced" }));
   });
 });
+
+describe("hints on an invite-only deployment", () => {
+  it("never tell visitors to sign in when sign-up is closed", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SIGNUPS", "closed");
+    const body = await (
+      await status(
+        new NextRequest("https://fieldwork.vercel.app/api/ai/status"),
+      )
+    ).json();
+    expect(body).toMatchObject({ allowed: false, local: false });
+    expect(body.message).toContain("your own OpenAI key");
+    expect(body.message).not.toContain("Sign in");
+    await expect(
+      inferenceAccess(hosted("/api/resume/extract")),
+    ).rejects.toThrow(/^Add your own OpenAI key/);
+  });
+
+  it("mention sign-in when accounts are open", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const body = await (
+      await status(
+        new NextRequest("https://fieldwork.vercel.app/api/ai/status"),
+      )
+    ).json();
+    expect(body.message).toContain("Sign in");
+  });
+});

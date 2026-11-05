@@ -20,6 +20,8 @@ import { GeneralStudyView, studyTotal } from "./views/general-study-view";
 import { ApprovedTasksView } from "./views/approved-tasks-view";
 import { useWorkspaceData } from "./hooks/use-workspace-data";
 import { useAiStatus } from "./hooks/use-ai-status";
+import { DemoNotice } from "./shell/demo-notice";
+import { signupsOpen } from "@/lib/deployment";
 import { useNavPreference } from "./hooks/use-nav-preference";
 import { usePracticeNotes } from "./hooks/use-practice-notes";
 
@@ -55,6 +57,7 @@ export default function Workspace() {
   const notes = usePracticeNotes(ws.mode === "live" ? ws.email : "demo");
   const [tab, setTab] = useState<TabId>("overview");
   const [modal, setModal] = useState<Modal | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
   const [generalPreparation, setGeneralPreparation] = useState(true);
   const [preparationJob, setPreparationJob] = useState<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -121,7 +124,16 @@ export default function Workspace() {
           onRefreshStatus={ai.refresh}
           onSignIn={() => open({ type: "auth" })}
           onSignOut={ws.signOut}
+          statusOpen={statusOpen}
+          onStatusToggle={setStatusOpen}
         />
+        {/* Hosted copies explain themselves; local development doesn't need it. */}
+        {ws.mode === "demo" && ai.status?.local === false && (
+          <DemoNotice
+            onAddKey={() => setStatusOpen(true)}
+            onOpenApplications={() => navigate("applications")}
+          />
+        )}
         <header className="header">
           <div>
             <div className="eyebrow">
@@ -296,7 +308,7 @@ export default function Workspace() {
           ) : modal.type === "auth" ? (
             <AuthFormBody
               available={ws.canSignIn}
-              signupsOpen={process.env.NEXT_PUBLIC_SIGNUPS !== "closed"}
+              signupsOpen={signupsOpen()}
               busy={ws.busy}
               onSubmit={async (credentials, signup) => {
                 const outcome = await ws.authenticate(credentials, signup);
