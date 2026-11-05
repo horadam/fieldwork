@@ -489,7 +489,7 @@ export function ApplicationsView({
                   <h3>Proposed study tasks</h3>
                   {run.output.tasks.map((t, i) => (
                     <div className="list-row" key={i}>
-                      <span className="index">0{i + 1}</span>
+                      <span className="index">{i + 1}</span>
                       <div className="grow">
                         <strong>{t.title}</strong>
                         <p className="tiny muted">{t.detail}</p>

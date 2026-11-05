@@ -3,8 +3,6 @@ import type { Workspace } from "@/lib/domain";
 import { agendaMinutes, overviewSteps } from "@/lib/sample-practice";
 import type { TabId } from "../shell/tabs";
 
-const pad = (n: number) => n.toString().padStart(2, "0");
-
 export function OverviewView({
   data,
   studyDone,
@@ -41,15 +39,15 @@ export function OverviewView({
       </section>
       <div className="stats">
         <div className="stat">
-          <strong>{pad(data.jobs.length)}</strong>
+          <strong>{data.jobs.length}</strong>
           <span>Applications tracked</span>
         </div>
         <div className="stat">
-          <strong>{pad(data.experience.length)}</strong>
+          <strong>{data.experience.length}</strong>
           <span>Experience records</span>
         </div>
         <div className="stat">
-          <strong>{pad(data.tasks.filter((t) => !t.done).length)}</strong>
+          <strong>{data.tasks.filter((t) => !t.done).length}</strong>
           <span>Approved tasks to work on</span>
         </div>
       </div>
@@ -59,7 +57,7 @@ export function OverviewView({
           <h2>Start with what matters.</h2>
           {overviewSteps.map((s, i) => (
             <div className="list-row" key={s.title}>
-              <span className="index">0{i + 1}</span>
+              <span className="index">{i + 1}</span>
               <div className="grow">
                 <h3>{s.title}</h3>
                 <p className="tiny muted">{s.detail}</p>
