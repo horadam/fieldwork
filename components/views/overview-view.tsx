@@ -3,7 +3,6 @@ import type { Workspace } from "@/lib/domain";
 import { agendaMinutes, overviewSteps } from "@/lib/sample-practice";
 import type { TabId } from "../shell/tabs";
 
-
 export function OverviewView({
   data,
   studyDone,
