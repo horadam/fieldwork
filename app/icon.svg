@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>Fieldwork</title>
+  <rect width="32" height="32" rx="7" fill="#252a27"/>
+  <text x="5" y="27" font-family="Georgia, 'Times New Roman', serif" font-size="27" fill="#f5f3ed">f</text>
+  <path d="M19 14 L27 6 M20.5 6 H27 V12.5" fill="none" stroke="#e0784f" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
