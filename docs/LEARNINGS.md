@@ -20,6 +20,7 @@ Non-obvious things this project has taught its contributors, human or agent. Rea
 
 - **Use "Add user", not "Invite user".** Invite sends a magic link, and the app has no set-password screen, so invited people can't sign in with a password later. (2026-11-05)
 - **`NEXT_PUBLIC_SIGNUPS=closed` only hides the button.** Supabase's "Allow new users to sign up" switch is what enforces invite-only. (2026-11-05)
+- **Create the browser Supabase client once per page.** React runs effects twice in development, and Fast Refresh remounts components, so `createClient` inside an effect makes several clients on the same session ("Multiple GoTrueClient instances"). Use `browserSupabase()` in `lib/supabase-browser.ts`. (2026-11-05)
 - **The built-in mailer is for testing.** It sends a handful of emails per hour, only to members of the Supabase organization, so open sign-up on a public site needs custom SMTP. (2026-11-05)
 
 ## Model calls
