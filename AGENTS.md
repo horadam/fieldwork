@@ -50,6 +50,11 @@ Interview-prep workspace: resume import → experience bank → JD fit analysis 
 - Reject oversized input; never truncate silently.
 - Record `durationMs` and token usage on every model call.
 
+## Learnings
+
+- Read `docs/LEARNINGS.md` before working in an area it covers (CSP and headers, deployment, Supabase, model calls, tests).
+- When something non-obvious costs you time (a trap, a hidden constraint, a fix that only works one way), add a short dated entry: what happens, why, and where. Remove entries the code has made obsolete. Don't record what the code or git history already says.
+
 ## Definition of done
 
 - `pnpm typecheck` and `pnpm test` pass; `pnpm build` passes for UI/route changes
