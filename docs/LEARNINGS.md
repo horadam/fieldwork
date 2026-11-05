@@ -19,7 +19,7 @@ Non-obvious things this project has taught its contributors, human or agent. Rea
 ## Supabase
 
 - **Use "Add user", not "Invite user".** Invite sends a magic link, and the app has no set-password screen, so invited people can't sign in with a password later. (2026-11-05)
-- **`NEXT_PUBLIC_SIGNUPS=closed` only hides the button.** Supabase's "Allow new users to sign up" switch is what enforces invite-only. (2026-11-05)
+- **`NEXT_PUBLIC_SIGNUPS=closed` only hides the button.** Sign-ups through Supabase's API still work. What keeps strangers out is **Confirm email**: the built-in mailer only reaches organization members, so their accounts stay unconfirmed. Turning off "Allow new users to sign up" would block them outright, but local development shares the same Supabase project, so it would also disable local sign-up. (2026-11-05)
 - **The built-in mailer is for testing.** It sends a handful of emails per hour, only to members of the Supabase organization, so open sign-up on a public site needs custom SMTP. (2026-11-05)
 
 ## Model calls

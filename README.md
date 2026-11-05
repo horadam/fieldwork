@@ -233,7 +233,7 @@ Any Next.js host works with Supabase accounts and `AI_PROVIDER=openai`. A hosted
 
 On a portfolio deployment, keep accounts invite-only. Open sign-up would store strangers' resumes, attract bot accounts, and hit the built-in Supabase mailer's limits; visitors don't need an account, because the browser workspace, Simulated preview and their own OpenAI key cover every flow.
 
-1. In Supabase, **Authentication → Sign In / Providers**: turn off **Allow new users to sign up**. This is what enforces invite-only; the app setting below only hides the button.
+1. In Supabase, keep **Confirm email** on (**Authentication → Sign In / Providers → Email**). The app setting below only hides the button: someone could still sign up by calling Supabase directly, but the built-in mailer only reaches members of your Supabase organization, so a stranger's account stays unconfirmed and can't sign in. To block sign-ups outright, turn off **Allow new users to sign up**. Local development and the public site share one Supabase project, though, so that also turns off **Create account** locally; use separate projects for development and production if you need both.
 2. In the host's environment variables, set `NEXT_PUBLIC_SIGNUPS=closed` and redeploy. The sign-in dialog then hides **Create account** and points visitors to the account-free options.
 3. To give someone an account, use **Authentication → Users → Add user → Create new user**, set a password and tick **Auto Confirm User**. Supabase's **Invite user** sends a magic link instead, and the app has no set-password screen, so invited users couldn't sign in with a password later.
 4. Leave `OPENAI_API_KEY` unset unless you want signed-in users to run on your key; if you set it, give its OpenAI project a monthly budget.
