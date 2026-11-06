@@ -7,14 +7,11 @@ import type { TabId } from "./shell/tabs";
 import { Dialog } from "./modals/dialog";
 import { ConfirmDeleteBody } from "./modals/confirm-delete";
 import { TargetEditor } from "./preparation/target-editor";
+import { OverflowMenu } from "./ui/overflow-menu";
 import { TimingFields } from "./preparation/timing-fields";
 import { DraftReview } from "./preparation/draft-review";
 import { PlanPractice } from "./preparation/plan-practice";
-import {
-  EarlierTasks,
-  PlanSchedule,
-  PlanTasks,
-} from "./preparation/plan-views";
+import { EarlierTasks, PlanSchedule } from "./preparation/plan-views";
 import type { Job, Workspace } from "@/lib/domain";
 import {
   activateLocal,
@@ -59,6 +56,8 @@ type Props = {
   provider: string;
   ai?: AiStatus | null;
 };
+// Dropdown value for a single role, keyed by its application.
+const roleKey = (jobId: string) => `job:${jobId}`;
 const message = (e: unknown, fallback: string) =>
   e instanceof Error ? e.message : fallback;
 // Roughly what plan generation sends: each job's description and latest
@@ -100,10 +99,11 @@ export function PreparationWorkspace(props: Props) {
   const [loadFailed, setLoadFailed] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  // null: closed; undefined target: creating a new one.
-  const [editor, setEditor] = useState<{ target?: PreparationTarget } | null>(
-    null,
-  );
+  // The group form, if open: creating a group, or editing `target`.
+  const [editor, setEditor] = useState<{
+    mode: "group";
+    target?: PreparationTarget;
+  } | null>(null);
   const [settings, setSettings] = useState<PlanSettings>(defaultSettings);
   const [draft, setDraft] = useState<PreparationPlanVersion | null>(null);
   const [versionId, setVersionId] = useState("");
@@ -137,8 +137,17 @@ export function PreparationWorkspace(props: Props) {
       });
       setState(next);
       const remembered = localStorage.getItem(selectionKey) || "general";
+      // Earlier versions remembered a single role by its saved record's id.
+      const saved = next.targets.find((t) => t.id === remembered);
       setSelected(
-        next.targets.some((t) => t.id === remembered) ? remembered : "general",
+        saved
+          ? saved.jobIds.length === 1
+            ? roleKey(saved.jobIds[0])
+            : saved.id
+          : remembered.startsWith("job:") &&
+              workspace.jobs.some((j) => `job:${j.id}` === remembered)
+            ? remembered
+            : "general",
       );
       setReady(true);
     } catch (e) {
@@ -161,9 +170,39 @@ export function PreparationWorkspace(props: Props) {
     }
   }, [selected, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const target = state.targets.find((t) => t.id === selected);
+  // Every role is selectable. Its preparation record is saved only when a
+  // plan is generated; until then the selection uses an unsaved stand-in.
+  const savedRole = (jobId: string, targets = state.targets) =>
+    targets.find((t) => t.jobIds.length === 1 && t.jobIds[0] === jobId);
+  function resolve(key: string, targets = state.targets) {
+    if (!key.startsWith("job:")) return targets.find((t) => t.id === key);
+    const jobId = key.slice(4);
+    const job = workspace.jobs.find((j) => j.id === jobId);
+    return (
+      savedRole(jobId, targets) ??
+      (job && {
+        id:
+          jobTargetIds.current[jobId] ||
+          (jobTargetIds.current[jobId] = crypto.randomUUID()),
+        name: `${job.company} · ${job.role}`.slice(0, 160),
+        jobIds: [jobId],
+        settings: defaultSettings(),
+        activeVersionId: null,
+      })
+    );
+  }
+  const target = resolve(selected);
+  // A group prepares for two or three roles together.
+  const isGroup = !!target && target.jobIds.length > 1;
+  const groups = state.targets.filter((t) => t.jobIds.length > 1);
+  // Saved roles whose application was deleted keep their plans selectable.
+  const orphanRoles = state.targets.filter(
+    (t) =>
+      t.jobIds.length === 1 &&
+      !workspace.jobs.some((j) => j.id === t.jobIds[0]),
+  );
   const versions = state.plans
-    .filter((p) => p.targetId === selected)
+    .filter((p) => p.targetId === target?.id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const plan = versions.find(
     (p) => p.id === (versionId || target?.activeVersionId),
@@ -240,38 +279,12 @@ export function PreparationWorkspace(props: Props) {
     );
   }
 
-  // "Prepare for this job" from Applications opens (or creates) its target.
+  // "Prepare for this job" from Applications selects that role.
   useEffect(() => {
-    if (!ready || !props.requestedJob || handled.current === props.requestedJob)
-      return;
-    const id = props.requestedJob;
-    handled.current = id;
-    const job = workspace.jobs.find((j) => j.id === id);
-    if (!job) {
-      handled.current = null;
-      props.onRequestHandled();
-      return;
-    }
-    const existing = state.targets.find(
-      (t) => t.jobIds.length === 1 && t.jobIds[0] === id,
-    );
-    void work("Opening preparation target…", async () => {
-      const next =
-        existing ||
-        (await saveTarget({
-          id:
-            jobTargetIds.current[id] ||
-            (jobTargetIds.current[id] = crypto.randomUUID()),
-          name: `${job.company} · ${job.role}`.slice(0, 160),
-          jobIds: [id],
-          settings: defaultSettings(),
-          activeVersionId: null,
-        }));
-      choose(next.id, next);
-    }).finally(() => {
-      props.onRequestHandled();
-      handled.current = null;
-    });
+    if (!ready || !props.requestedJob) return;
+    if (workspace.jobs.some((j) => j.id === props.requestedJob))
+      choose(roleKey(props.requestedJob));
+    props.onRequestHandled();
   }, [props.requestedJob, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -281,17 +294,23 @@ export function PreparationWorkspace(props: Props) {
   useEffect(() => {
     if (!ready || !props.requestedTarget) return;
     const target = state.targets.find((t) => t.id === props.requestedTarget);
-    if (target) choose(target.id, target);
+    if (target)
+      choose(
+        target.jobIds.length === 1 &&
+          workspace.jobs.some((j) => j.id === target.jobIds[0])
+          ? roleKey(target.jobIds[0])
+          : target.id,
+      );
     props.onRequestHandled();
   }, [props.requestedTarget, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function choose(id: string, known?: PreparationTarget) {
-    setSelected(id);
+  function choose(key: string, known?: PreparationTarget) {
+    setSelected(key);
     setVersionId("");
     setQuestionId("");
     setDraft(null);
     setEditor(null);
-    const next = known || stateRef.current.targets.find((t) => t.id === id);
+    const next = known || resolve(key, stateRef.current.targets);
     if (next) setSettings(next.settings);
   }
 
@@ -420,27 +439,31 @@ export function PreparationWorkspace(props: Props) {
   }
   async function deleteTarget() {
     if (!target) return;
-    const done = await work("Deleting target…", async () => {
-      await persist(
-        (old) => {
-          const ids = old.plans
-            .filter((p) => p.targetId === target.id)
-            .map((p) => p.id);
-          return {
-            targets: old.targets.filter((t) => t.id !== target.id),
-            plans: old.plans.filter((p) => p.targetId !== target.id),
-            progress: old.progress.filter((p) => !ids.includes(p.planId)),
-          };
-        },
-        "delete",
-        { id: target.id },
-      );
-      choose("general");
-    });
+    const done = await work(
+      isGroup ? "Deleting group…" : "Deleting plan…",
+      async () => {
+        await persist(
+          (old) => {
+            const ids = old.plans
+              .filter((p) => p.targetId === target.id)
+              .map((p) => p.id);
+            return {
+              targets: old.targets.filter((t) => t.id !== target.id),
+              plans: old.plans.filter((p) => p.targetId !== target.id),
+              progress: old.progress.filter((p) => !ids.includes(p.planId)),
+            };
+          },
+          "delete",
+          { id: target.id },
+        );
+        // A role stays selected, ready for a new plan; a deleted group is gone.
+        choose(isGroup ? "general" : selected);
+      },
+    );
     if (done) setConfirmDelete(false);
   }
 
-  if (!["practice", "study", "tasks"].includes(props.section)) return null;
+  if (!["practice", "study"].includes(props.section)) return null;
   const checklist = plan &&
     progress && {
       plan,
@@ -452,44 +475,92 @@ export function PreparationWorkspace(props: Props) {
   return (
     <section className="preparation-workspace">
       <div className="card">
-        <div className="form">
-          <label htmlFor="preparation-target">Preparing for…</label>
-          <div className="actions">
-            <select
-              id="preparation-target"
-              className="prep-select"
-              value={selected}
-              disabled={!!busy || !ready}
-              onChange={(e) => choose(e.target.value)}
-            >
-              <option value="general">General practice</option>
-              {state.targets.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <button
-              className="button secondary small"
-              disabled={!!busy || !ready}
-              onClick={() => setEditor({})}
-            >
-              Create preparation group
-            </button>
+        {/* Hidden while a form is open, so only one choice is in view. */}
+        {!editor && (
+          <div className="form">
+            <label htmlFor="preparation-target">Preparing for…</label>
+            <div className="actions">
+              <select
+                id="preparation-target"
+                className="prep-select"
+                value={selected}
+                disabled={!!busy || !ready}
+                onChange={(e) => choose(e.target.value)}
+              >
+                <option value="general">General practice</option>
+                {workspace.jobs.length + orphanRoles.length > 0 && (
+                  <optgroup label="Roles">
+                    {workspace.jobs.map((job) => (
+                      <option key={job.id} value={roleKey(job.id)}>
+                        {job.company} · {job.role}
+                      </option>
+                    ))}
+                    {orphanRoles.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} (deleted application)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {groups.length > 0 && (
+                  <optgroup label="Groups">
+                    {groups.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              {/* Only once there's something to edit or delete. */}
+              {target && (isGroup || versions.length > 0) && (
+                <OverflowMenu
+                  label={`Actions for ${target.name}`}
+                  items={[
+                    ...(isGroup
+                      ? [
+                          {
+                            label: "Edit group",
+                            onSelect: () =>
+                              setEditor({ mode: "group", target }),
+                            disabled: !!busy,
+                          },
+                        ]
+                      : []),
+                    {
+                      label: isGroup
+                        ? "Delete group"
+                        : "Delete plan and progress",
+                      onSelect: () => setConfirmDelete(true),
+                      danger: true,
+                      disabled: !!busy,
+                    },
+                  ]}
+                />
+              )}
+              <button
+                className="button secondary small"
+                disabled={!!busy || !ready}
+                onClick={() => setEditor({ mode: "group" })}
+              >
+                Create a group
+              </button>
+            </div>
+            {target && isGroup && (
+              <p className="tiny muted">
+                Roles:{" "}
+                {target.jobIds
+                  .map((id) => {
+                    const job = workspace.jobs.find((j) => j.id === id);
+                    return job
+                      ? `${job.company} · ${job.role}`
+                      : "Deleted application";
+                  })
+                  .join(" / ")}
+              </p>
+            )}
           </div>
-          {target && (
-            <p className="tiny muted">
-              {target.jobIds
-                .map((id) => {
-                  const job = workspace.jobs.find((j) => j.id === id);
-                  return job
-                    ? `${job.company} · ${job.role}`
-                    : "Deleted application";
-                })
-                .join(" / ")}
-            </p>
-          )}
-        </div>
+        )}
         {error && (
           <div className="notice error" role="alert">
             {error}
@@ -516,14 +587,14 @@ export function PreparationWorkspace(props: Props) {
             )}
           </p>
         )}
-        {editor && (
+        {editor?.mode === "group" && (
           <TargetEditor
             target={editor.target}
             jobs={workspace.jobs}
             busy={!!busy}
             onCancel={() => setEditor(null)}
             onSave={(value) =>
-              void work("Saving target…", async () => {
+              void work("Saving group…", async () => {
                 const saved = await saveTarget(value);
                 choose(saved.id, saved);
               })
@@ -532,22 +603,9 @@ export function PreparationWorkspace(props: Props) {
         )}
         {target && !editor && (
           <>
-            <div className="actions prep-toolbar">
-              <button
-                className="button secondary small"
-                disabled={!!busy}
-                onClick={() => setEditor({ target })}
-              >
-                Edit target
-              </button>
-              <button
-                className="button danger small"
-                disabled={!!busy}
-                onClick={() => setConfirmDelete(true)}
-              >
-                Delete target
-              </button>
-              {versions.length > 0 && (
+            {/* Shown once there's more than one version to choose from. */}
+            {versions.length > 1 && (
+              <div className="actions prep-toolbar">
                 <label className="tiny">
                   Plan version{" "}
                   <select
@@ -568,8 +626,8 @@ export function PreparationWorkspace(props: Props) {
                     ))}
                   </select>
                 </label>
-              )}
-            </div>
+              </div>
+            )}
             {plan && outdated(plan, target, workspace) && (
               <p className="notice">
                 This plan’s inputs have changed. Your current plan and progress
@@ -655,9 +713,6 @@ export function PreparationWorkspace(props: Props) {
           {props.section === "study" && schedule && (
             <PlanSchedule {...checklist} schedule={schedule} />
           )}
-          {props.section === "tasks" && schedule && (
-            <PlanTasks key={plan.id} {...checklist} schedule={schedule} />
-          )}
         </>
       )}
       {target && !plan && !draft && (
@@ -666,7 +721,7 @@ export function PreparationWorkspace(props: Props) {
           budget, then generate and review a plan.
         </p>
       )}
-      {target && props.section === "tasks" && (
+      {target && props.section === "study" && (
         <EarlierTasks
           target={target}
           workspace={workspace}
@@ -676,7 +731,7 @@ export function PreparationWorkspace(props: Props) {
       )}
       {confirmDelete && target && (
         <Dialog
-          title="Delete this target?"
+          title={isGroup ? "Delete this group?" : "Delete this plan?"}
           close={() => {
             if (!busy) setConfirmDelete(false);
           }}
@@ -688,8 +743,14 @@ export function PreparationWorkspace(props: Props) {
           )}
           <ConfirmDeleteBody
             busy={!!busy}
-            confirmLabel="Delete target and progress"
-            consequence="This deletes the target, all its plan versions, and their progress. Applications and earlier analysis tasks remain."
+            confirmLabel={
+              isGroup ? "Delete group and progress" : "Delete plan and progress"
+            }
+            consequence={
+              isGroup
+                ? "This deletes the group, all its plan versions, and their progress. Applications and earlier analysis tasks remain."
+                : "This deletes this role's plan versions and their progress. The role stays in the list, ready for a new plan."
+            }
             onConfirm={() => void deleteTarget()}
             onCancel={() => setConfirmDelete(false)}
           />
