@@ -82,6 +82,7 @@ describe("status pill without a model", () => {
         onSignOut={() => {}}
         statusOpen
         onStatusToggle={() => {}}
+        onSetUpKey={() => {}}
       />,
     );
     expect(document.body.textContent).toContain(
@@ -90,5 +91,72 @@ describe("status pill without a model", () => {
     expect(document.body.textContent).toContain("No AI model available");
     expect(document.body.textContent).not.toContain("qwen3");
     expect(document.body.textContent).not.toContain("no API cost");
+  });
+});
+
+describe("status panel", () => {
+  // jsdom has no IntersectionObserver; this one reports the pill as visible.
+  class VisibleObserver {
+    constructor(private report: IntersectionObserverCallback) {}
+    observe() {
+      this.report(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        this as unknown as IntersectionObserver,
+      );
+    }
+    disconnect() {}
+  }
+  const ai = {
+    provider: "ollama" as const,
+    model: "qwen3:8b",
+    ready: true,
+    message: "",
+    allowed: true,
+  };
+  function open() {
+    vi.stubGlobal("IntersectionObserver", VisibleObserver);
+    const handlers = { onStatusToggle: vi.fn(), onSetUpKey: vi.fn() };
+    render(
+      <>
+        <Topbar
+          section="Overview"
+          mode="demo"
+          email=""
+          ai={ai}
+          aiProblem=""
+          onRefreshStatus={() => {}}
+          onSignIn={() => {}}
+          onSignOut={() => {}}
+          statusOpen
+          {...handlers}
+        />
+        <p>Elsewhere on the page</p>
+      </>,
+    );
+    return handlers;
+  }
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("stays open while used, and closes on an outside click", () => {
+    const handlers = open();
+    fireEvent.pointerDown(screen.getByText(/Refresh model status/));
+    expect(handlers.onStatusToggle).not.toHaveBeenCalled();
+    fireEvent.pointerDown(screen.getByText("Elsewhere on the page"));
+    expect(handlers.onStatusToggle).toHaveBeenCalledWith(false);
+  });
+
+  it("closes on Escape", () => {
+    const handlers = open();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(handlers.onStatusToggle).toHaveBeenCalledWith(false);
+  });
+
+  it("opens key setup in a dialog instead of inline", () => {
+    const handlers = open();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use your own OpenAI key" }),
+    );
+    expect(handlers.onSetUpKey).toHaveBeenCalled();
+    expect(screen.queryByLabelText("OpenAI API key")).toBeNull();
   });
 });

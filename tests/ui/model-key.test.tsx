@@ -7,7 +7,11 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import { ModelKey, SessionTotal } from "../../components/shell/model-key";
+import {
+  KeyForm,
+  KeySummary,
+  SessionTotal,
+} from "../../components/shell/model-key";
 import { CostHint } from "../../components/ui/cost-hint";
 import { apiClient, usageFrom } from "../../lib/api-client";
 import {
@@ -149,10 +153,7 @@ describe("model key panel", () => {
     return fetcher;
   }
   async function checkKey(value = key) {
-    render(<ModelKey />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Use your own OpenAI key" }),
-    );
+    render(<KeyForm onDone={() => {}} />);
     fireEvent.change(screen.getByLabelText("OpenAI API key"), {
       target: { value },
     });
@@ -168,12 +169,39 @@ describe("model key panel", () => {
       "x-openai-key": key,
     });
     fireEvent.click(screen.getByRole("button", { name: "Use this key" }));
+    expect(getUserKeyState().userKey?.key).toBe(key);
+  });
+
+  it("summarises a saved key by its last four characters", () => {
+    saveUserKey({ key, model: "gpt-6-luna" }, false);
+    const onSetUp = vi.fn();
+    render(<KeySummary onSetUp={onSetUp} />);
     expect(screen.getByText(/is in use/).textContent).toContain(
       `…${key.slice(-4)}`,
     );
     expect(document.body.textContent).not.toContain(key);
-    fireEvent.click(screen.getByRole("button", { name: "Forget key" }));
-    expect(screen.getByRole("button", { name: "Use your own OpenAI key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
+    expect(onSetUp).toHaveBeenCalled();
+    act(() =>
+      fireEvent.click(screen.getByRole("button", { name: "Forget key" })),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use your own OpenAI key" }),
+    );
+    expect(onSetUp).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes the form once the key is saved", async () => {
+    models();
+    const onDone = vi.fn();
+    render(<KeyForm onDone={onDone} />);
+    fireEvent.change(screen.getByLabelText("OpenAI API key"), {
+      target: { value: key },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check key" }));
+    await screen.findByLabelText("Model");
+    fireEvent.click(screen.getByRole("button", { name: "Use this key" }));
+    expect(onDone).toHaveBeenCalled();
   });
 
   it("offers only the key's priced models, with the suggestion selected", async () => {
@@ -225,10 +253,7 @@ describe("model key panel", () => {
   });
 
   it("recommends a limited, revocable key", () => {
-    render(<ModelKey />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Use your own OpenAI key" }),
-    );
+    render(<KeyForm onDone={() => {}} />);
     expect(document.body.textContent).toContain("monthly budget");
     expect(
       screen
@@ -238,10 +263,7 @@ describe("model key panel", () => {
   });
 
   it("rejects something that isn't a key", () => {
-    render(<ModelKey />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Use your own OpenAI key" }),
-    );
+    render(<KeyForm onDone={() => {}} />);
     fireEvent.change(screen.getByLabelText("OpenAI API key"), {
       target: { value: "hello" },
     });

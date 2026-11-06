@@ -3,8 +3,7 @@ export type TabId =
   | "experience"
   | "applications"
   | "practice"
-  | "study"
-  | "tasks";
+  | "study";
 
 // Order is the sidebar order. Icons are 24px stroke paths, shown alone when the
 // sidebar is collapsed.
@@ -53,13 +52,6 @@ export const tabs: {
     title: "Four weeks. Steady progress.",
     subtitle:
       "10–15 hours a week, with something concrete to show for each one.",
-  },
-  {
-    id: "tasks",
-    label: "Preparation tasks",
-    icon: "M4 12l5 5L20 6",
-    title: "Turn insight into action.",
-    subtitle: "The activities in your preparation plans, week by week.",
   },
 ];
 

@@ -91,7 +91,7 @@ their active plans (via `planSummaries()`), or offers **Prepare for this job**.
 An earlier flow let users approve an analysis's tasks directly into a task list.
 It was retired on 2026-11-05: the `/api/approve` route, `approveLocal` and the
 approve button are gone. Tasks approved before then remain in
-`preparation_tasks` and stay usable under Preparation tasks. The
+`preparation_tasks` and stay usable under Study plan. The
 `approve_analysis` database function from migration 001 still exists but is
 unused; applied migrations are not edited.
 

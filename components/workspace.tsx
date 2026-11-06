@@ -21,6 +21,7 @@ import { EarlierTasksView } from "./views/earlier-tasks-view";
 import { useWorkspaceData } from "./hooks/use-workspace-data";
 import { useAiStatus } from "./hooks/use-ai-status";
 import { DemoNotice } from "./shell/demo-notice";
+import { KeyForm } from "./shell/model-key";
 import { signupsOpen } from "@/lib/deployment";
 import type { PlanSummary } from "@/lib/preparation-plan";
 import { useNavPreference } from "./hooks/use-nav-preference";
@@ -32,6 +33,7 @@ type Modal =
   | { type: "job-import" }
   | { type: "resume-import" }
   | { type: "auth" }
+  | { type: "openai-key" }
   | { type: "delete"; entity: Entity; id: string };
 
 const modalTitle = (modal: Modal) =>
@@ -41,15 +43,17 @@ const modalTitle = (modal: Modal) =>
       ? "Import resume"
       : modal.type === "auth"
         ? "Your private workspace"
-        : modal.type === "delete"
-          ? "Delete this record?"
-          : modal.form.entity === "job"
-            ? modal.form.value
-              ? "Edit application"
-              : "Add application"
-            : modal.form.value
-              ? "Edit experience"
-              : "Add user-confirmed experience";
+        : modal.type === "openai-key"
+          ? "Your OpenAI key"
+          : modal.type === "delete"
+            ? "Delete this record?"
+            : modal.form.entity === "job"
+              ? modal.form.value
+                ? "Edit application"
+                : "Add application"
+              : modal.form.value
+                ? "Edit experience"
+                : "Add user-confirmed experience";
 
 export default function Workspace() {
   const ws = useWorkspaceData();
@@ -75,6 +79,7 @@ export default function Workspace() {
   }, [tab]);
   function navigate(next: TabId) {
     navigated.current = true;
+    setStatusOpen(false);
     setTab(next);
     ws.setSelectedRun(null);
     ws.setError("");
@@ -131,11 +136,15 @@ export default function Workspace() {
           onSignOut={ws.signOut}
           statusOpen={statusOpen}
           onStatusToggle={setStatusOpen}
+          onSetUpKey={() => {
+            setStatusOpen(false);
+            open({ type: "openai-key" });
+          }}
         />
         {/* Hosted copies explain themselves; local development doesn't need it. */}
         {ws.mode === "demo" && ai.status?.local === false && (
           <DemoNotice
-            onAddKey={() => setStatusOpen(true)}
+            onAddKey={() => open({ type: "openai-key" })}
             onOpenApplications={() => navigate("applications")}
           />
         )}
@@ -280,7 +289,8 @@ export default function Workspace() {
         {tab === "study" && generalPreparation && (
           <GeneralStudyView study={notes.study} setStudy={notes.setStudy} />
         )}
-        {tab === "tasks" && generalPreparation && (
+        {/* Tasks approved from analyses before plans replaced approval. */}
+        {tab === "study" && generalPreparation && ws.data.tasks.length > 0 && (
           <EarlierTasksView
             tasks={ws.data.tasks}
             savingTask={ws.savingTask}
@@ -331,6 +341,8 @@ export default function Workspace() {
                 return outcome;
               }}
             />
+          ) : modal.type === "openai-key" ? (
+            <KeyForm onDone={() => setModal(null)} />
           ) : modal.type === "delete" ? (
             <ConfirmDeleteBody
               busy={ws.busy}
