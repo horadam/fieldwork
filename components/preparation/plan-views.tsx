@@ -1,4 +1,5 @@
 "use client";
+import { Meta, dateRange } from "../ui/meta";
 import { useState } from "react";
 import type { Workspace } from "@/lib/domain";
 import {
@@ -45,12 +46,13 @@ export function PlanSchedule({
       </p>
       {schedule.weeks.map((week, i) => (
         <section className="card" key={week.start}>
-          <h2>
-            Week {i + 1} · {week.start}–{week.end}
-          </h2>
-          <p className="tiny muted">
-            {week.used} / {week.capacity} minutes
-          </p>
+          <h2>Week {i + 1}</h2>
+          <Meta
+            items={[
+              dateRange(week.start, week.end),
+              `${week.used} / ${week.capacity} minutes`,
+            ]}
+          />
           {week.activityIds.length ? (
             <ActivityChecklist {...checklist} ids={week.activityIds} />
           ) : (

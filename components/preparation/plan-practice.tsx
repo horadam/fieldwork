@@ -3,7 +3,7 @@ import type {
   PreparationPlanVersion,
   PreparationProgress,
 } from "@/lib/preparation-plan";
-import { sourceLabels } from "./labels";
+import { SourceList } from "./source-list";
 
 const rubric = ["Clarity", "Correctness", "Depth", "Tradeoffs", "Ownership"];
 
@@ -45,7 +45,7 @@ export function PlanPractice({
         </select>
       </label>
       <h2>{question.text}</h2>
-      <p className="tiny muted">{sourceLabels(question.refs, plan)}</p>
+      <SourceList refs={question.refs} plan={plan} />
       <details>
         <summary>Suggested answer outline</summary>
         <p style={{ whiteSpace: "pre-wrap" }}>{question.outline}</p>

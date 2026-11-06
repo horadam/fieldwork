@@ -5,7 +5,8 @@ import {
   settingsSchema,
   type PreparationPlanVersion,
 } from "@/lib/preparation-plan";
-import { sourceLabels } from "./labels";
+import { SourceList } from "./source-list";
+import { Meta, dateRange } from "../ui/meta";
 import { TimingFields } from "./timing-fields";
 
 type Draft = PreparationPlanVersion;
@@ -31,6 +32,8 @@ export function DraftReview({
     : null;
   const title = (id: string) =>
     draft.output.activities.find((a) => a.id === id)!.title;
+  const minutes = (id: string) =>
+    draft.output.activities.find((a) => a.id === id)!.minutes;
   const setQuestion = (index: number, change: Partial<Question>) =>
     onChange({
       ...draft,
@@ -60,18 +63,20 @@ export function DraftReview({
       >
         <h2>Review your preparation plan</h2>
         <p>{draft.output.summary}</p>
-        <p className="tiny muted">
-          {draft.metadata.provider} · {draft.metadata.model} ·{" "}
-          {draft.metadata.promptVersion} ·{" "}
-          {(draft.metadata.durationMs / 1000).toFixed(1)} s
-          {draft.metadata.outputTokens !== undefined &&
-            ` · ${usageLabel({
-              provider: draft.metadata.provider,
-              model: draft.metadata.model,
-              inputTokens: draft.metadata.inputTokens ?? 0,
-              outputTokens: draft.metadata.outputTokens,
-            })}`}
-        </p>
+        <Meta
+          items={[
+            `${draft.metadata.provider} · ${draft.metadata.model}`,
+            draft.metadata.promptVersion,
+            `${(draft.metadata.durationMs / 1000).toFixed(1)} s`,
+            draft.metadata.outputTokens !== undefined &&
+              usageLabel({
+                provider: draft.metadata.provider,
+                model: draft.metadata.model,
+                inputTokens: draft.metadata.inputTokens ?? 0,
+                outputTokens: draft.metadata.outputTokens,
+              }),
+          ]}
+        />
         {!!draft.metadata.repairs?.length && (
           <div className="notice" role="status">
             <strong>Some of the model&apos;s links were removed.</strong> The
@@ -112,7 +117,7 @@ export function DraftReview({
                   }
                 />
               </label>
-              <p className="tiny muted">{sourceLabels(q.refs, draft)}</p>
+              <SourceList refs={q.refs} plan={draft} />
             </div>
           </details>
         ))}
@@ -181,25 +186,74 @@ export function DraftReview({
                 </select>
               </label>
             </div>
-            <p className="tiny muted">{sourceLabels(a.refs, draft)}</p>
+            <SourceList refs={a.refs} plan={draft} />
           </fieldset>
         ))}
         <h3>Schedule preview</h3>
         {schedule ? (
           <>
-            <p>
-              {schedule.used} / {schedule.capacity} minutes allocated.
-            </p>
-            {schedule.weeks.map((week, i) => (
-              <p className="tiny" key={week.start}>
-                Week {i + 1} · {week.start}–{week.end} · {week.used}/
-                {week.capacity} min:{" "}
-                {week.activityIds.map(title).join("; ") || "No activities fit."}
+            <div className="meter">
+              <p className="tiny muted" id="draft-schedule-label">
+                {schedule.used} of {schedule.capacity} minutes allocated
               </p>
+              <div
+                className="progress"
+                role="progressbar"
+                aria-labelledby="draft-schedule-label"
+                aria-valuemin={0}
+                aria-valuemax={schedule.capacity}
+                aria-valuenow={schedule.used}
+              >
+                <span
+                  style={{
+                    width: `${schedule.capacity ? (schedule.used / schedule.capacity) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+            {schedule.weeks.map((week, i) => (
+              <div className="week" key={week.start}>
+                <div className="week-head">
+                  <h4>Week {i + 1}</h4>
+                  <Meta
+                    items={[
+                      dateRange(week.start, week.end),
+                      `${week.used} / ${week.capacity} min`,
+                    ]}
+                  />
+                </div>
+                {week.activityIds.length ? (
+                  <ol className="week-items">
+                    {week.activityIds.map((id) => (
+                      <li key={id}>
+                        <span>{title(id)}</span>
+                        <span>{minutes(id)} min</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="tiny muted">No activities fit this week.</p>
+                )}
+              </div>
             ))}
-            <p className="tiny">
-              Deferred: {schedule.deferred.map(title).join("; ") || "None"}
-            </p>
+            <div className="week">
+              <div className="week-head">
+                <h4>Deferred</h4>
+                <Meta items={["Doesn't fit the time available"]} />
+              </div>
+              {schedule.deferred.length ? (
+                <ul className="week-items">
+                  {schedule.deferred.map((id) => (
+                    <li key={id}>
+                      <span>{title(id)}</span>
+                      <span>{minutes(id)} min</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="tiny muted">Nothing deferred.</p>
+              )}
+            </div>
           </>
         ) : (
           <p>Choose valid dates and weekly hours to preview the schedule.</p>
