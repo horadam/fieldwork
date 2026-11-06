@@ -99,7 +99,7 @@ The bank supports 50 entries. Local confirmation writes the complete validated b
 
 ## Job-specific preparation targets
 
-Choose **Applications → ⋯ → Prepare for this job**, or open Interview practice and choose **Create preparation group** for one to three applications. The shared **Preparing for…** selector controls Interview practice, Study plan, and Preparation tasks. General practice retains your existing questions, notes, self-scores and general roadmap; old date-specific wording is removed. Selection is remembered separately for browser storage and each account.
+Choose **Applications → ⋯ → Prepare for this job**, or open Interview practice and choose **Prepare for a role** for one application or **Create a group** to prepare for two or three together. While either form is open, the selector is hidden. The shared **Preparing for…** selector controls Interview practice, Study plan, and Preparation tasks. General practice retains your existing questions, notes, self-scores and general roadmap; old date-specific wording is removed. Selection is remembered separately for browser storage and each account.
 
 1. Complete a current **real** analysis for every selected job. The setup shows missing/outdated analyses with explicit Run real analysis buttons; nothing runs just from selecting a target. Old browser runs without a saved JD snapshot need re-analysis once. Simulated previews cannot feed real preparation generation.
 2. Choose start date, **one week**, **two weeks**, or an interview date, and 0.5–40 hours/week. Defaults are today, one week and 12 hours/week. The interview day is included; partial weeks are prorated. Specific dates may be up to one year from the start.

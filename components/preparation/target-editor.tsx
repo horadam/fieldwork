@@ -7,8 +7,9 @@ import {
 } from "@/lib/preparation-plan";
 import { TimingFields } from "./timing-fields";
 
-// Create or edit a target. The form keeps its own copy of the fields, so
-// cancelling leaves the selected target's settings untouched.
+// Create or edit a group of two or three roles prepared for together. Single
+// roles use RolePicker instead. The form keeps its own copy of the fields, so
+// cancelling leaves the selected group's settings untouched.
 export function TargetEditor({
   target,
   jobs,
@@ -32,8 +33,8 @@ export function TargetEditor({
   const [problem, setProblem] = useState("");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!members.length || members.length > 3)
-      return setProblem("Choose one to three applications.");
+    if (members.length < 2 || members.length > 3)
+      return setProblem("Choose two or three roles for a group.");
     setProblem("");
     onSave({
       id: id.current,
@@ -45,14 +46,14 @@ export function TargetEditor({
   }
   return (
     <form className="form prep-editor" onSubmit={submit}>
-      <h3>{target ? "Edit target" : "Create preparation group"}</h3>
+      <h3>{target ? "Edit group" : "Create a group"}</h3>
       {problem && (
         <p role="alert" className="notice error">
           {problem}
         </p>
       )}
       <label>
-        Target name
+        Group name
         <input
           required
           maxLength={160}
@@ -62,10 +63,11 @@ export function TargetEditor({
         />
       </label>
       <fieldset>
-        <legend>Choose one to three applications</legend>
-        {!jobs.length && (
+        <legend>Choose two or three roles</legend>
+        {jobs.length < 2 && (
           <p className="tiny muted">
-            Add an application first; targets group one to three of them.
+            A group needs at least two applications. To prepare for one role,
+            use Prepare for a role.
           </p>
         )}
         {members
@@ -103,7 +105,7 @@ export function TargetEditor({
       <TimingFields value={settings} onChange={setSettings} disabled={busy} />
       <div className="actions">
         <button className="button" disabled={busy}>
-          Save target
+          Save group
         </button>
         <button
           type="button"

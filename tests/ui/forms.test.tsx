@@ -10,6 +10,7 @@ import {
 import { RecordFormBody } from "../../components/modals/record-form";
 import { AuthFormBody } from "../../components/modals/auth-form";
 import { TargetEditor } from "../../components/preparation/target-editor";
+import { RolePicker } from "../../components/preparation/role-picker";
 import { DraftReview } from "../../components/preparation/draft-review";
 import { seed } from "../../lib/seed";
 import { planSources } from "../../lib/preparation-plan";
@@ -132,7 +133,7 @@ describe("target editor", () => {
     expect(existing.settings.hoursPerWeek).toBe(12);
   });
 
-  it("requires one to three applications", () => {
+  it("requires two or three roles for a group", () => {
     const onSave = vi.fn();
     render(
       <TargetEditor
@@ -142,12 +143,60 @@ describe("target editor", () => {
         onCancel={() => {}}
       />,
     );
-    fireEvent.change(screen.getByLabelText("Target name"), {
+    expect(
+      screen.getByRole("heading", { name: "Create a group" }),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Group name"), {
       target: { value: "Group" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save target" }));
+    fireEvent.click(
+      screen.getByLabelText(`${seed.jobs[0].company} · ${seed.jobs[0].role}`),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save group" }));
     expect(onSave).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toContain("one to three");
+    expect(screen.getByRole("alert").textContent).toContain("two or three");
+  });
+});
+
+describe("role picker", () => {
+  it("starts preparing for the chosen role", () => {
+    const jobs = [
+      seed.jobs[0],
+      { ...seed.jobs[0], id: "job-2", company: "Other", role: "Engineer" },
+    ];
+    const onPick = vi.fn();
+    render(
+      <RolePicker
+        jobs={jobs}
+        busy={false}
+        onPick={onPick}
+        onCancel={() => {}}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Role"), {
+      target: { value: "job-2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start preparing" }));
+    expect(onPick).toHaveBeenCalledWith("job-2");
+  });
+
+  it("asks for an application when there are none", () => {
+    render(
+      <RolePicker
+        jobs={[]}
+        busy={false}
+        onPick={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(document.body.textContent).toContain("Add an application first.");
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Start preparing",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
   });
 });
 

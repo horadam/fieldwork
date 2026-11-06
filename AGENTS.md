@@ -49,6 +49,7 @@ Interview-prep workspace: resume import → experience bank → JD fit analysis 
 - Generated content is a draft until the user confirms; writes use stable IDs so retries are idempotent.
 - Reject oversized input; never truncate silently.
 - Record `durationMs` and token usage on every model call.
+- UI spacing: use the `--space-*` tokens in `app/globals.css`. Space between items comes from the container (the flow rule for cards, notices and disclosures, or `gap` in flex/grid), not from margins on individual buttons or paragraphs.
 
 ## Learnings
 

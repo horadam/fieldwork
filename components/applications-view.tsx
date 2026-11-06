@@ -411,7 +411,7 @@ export function ApplicationsView({
                 <h3>No fit analysis yet.</h3>
                 <p className="tiny muted">
                   Compare this job description with your confirmed experience.
-                  Nothing is saved as a plan until you approve it.
+                  The analysis shows which requirements your experience meets.
                 </p>
                 {analyzeButton}
               </div>

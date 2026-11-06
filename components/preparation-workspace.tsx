@@ -7,6 +7,7 @@ import type { TabId } from "./shell/tabs";
 import { Dialog } from "./modals/dialog";
 import { ConfirmDeleteBody } from "./modals/confirm-delete";
 import { TargetEditor } from "./preparation/target-editor";
+import { RolePicker } from "./preparation/role-picker";
 import { TimingFields } from "./preparation/timing-fields";
 import { DraftReview } from "./preparation/draft-review";
 import { PlanPractice } from "./preparation/plan-practice";
@@ -101,9 +102,10 @@ export function PreparationWorkspace(props: Props) {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   // null: closed; undefined target: creating a new one.
-  const [editor, setEditor] = useState<{ target?: PreparationTarget } | null>(
-    null,
-  );
+  // The open form, if any: prepare for one role, or create or edit a group.
+  const [editor, setEditor] = useState<
+    { mode: "role" } | { mode: "group"; target?: PreparationTarget } | null
+  >(null);
   const [settings, setSettings] = useState<PlanSettings>(defaultSettings);
   const [draft, setDraft] = useState<PreparationPlanVersion | null>(null);
   const [versionId, setVersionId] = useState("");
@@ -162,6 +164,10 @@ export function PreparationWorkspace(props: Props) {
   }, [selected, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const target = state.targets.find((t) => t.id === selected);
+  // A group prepares for two or three roles together; the rest are single roles.
+  const isGroup = !!target && target.jobIds.length > 1;
+  const roles = state.targets.filter((t) => t.jobIds.length === 1),
+    groups = state.targets.filter((t) => t.jobIds.length > 1);
   const versions = state.plans
     .filter((p) => p.targetId === selected)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -240,22 +246,14 @@ export function PreparationWorkspace(props: Props) {
     );
   }
 
-  // "Prepare for this job" from Applications opens (or creates) its target.
-  useEffect(() => {
-    if (!ready || !props.requestedJob || handled.current === props.requestedJob)
-      return;
-    const id = props.requestedJob;
-    handled.current = id;
+  // Opens (or creates) the single-role target for an application.
+  function prepareForJob(id: string) {
     const job = workspace.jobs.find((j) => j.id === id);
-    if (!job) {
-      handled.current = null;
-      props.onRequestHandled();
-      return;
-    }
-    const existing = state.targets.find(
+    if (!job) return Promise.resolve();
+    const existing = stateRef.current.targets.find(
       (t) => t.jobIds.length === 1 && t.jobIds[0] === id,
     );
-    void work("Opening preparation target…", async () => {
+    return work("Opening preparation…", async () => {
       const next =
         existing ||
         (await saveTarget({
@@ -268,7 +266,15 @@ export function PreparationWorkspace(props: Props) {
           activeVersionId: null,
         }));
       choose(next.id, next);
-    }).finally(() => {
+    });
+  }
+
+  // "Prepare for this job" from Applications.
+  useEffect(() => {
+    if (!ready || !props.requestedJob || handled.current === props.requestedJob)
+      return;
+    handled.current = props.requestedJob;
+    void prepareForJob(props.requestedJob).finally(() => {
       props.onRequestHandled();
       handled.current = null;
     });
@@ -452,44 +458,68 @@ export function PreparationWorkspace(props: Props) {
   return (
     <section className="preparation-workspace">
       <div className="card">
-        <div className="form">
-          <label htmlFor="preparation-target">Preparing for…</label>
-          <div className="actions">
-            <select
-              id="preparation-target"
-              className="prep-select"
-              value={selected}
-              disabled={!!busy || !ready}
-              onChange={(e) => choose(e.target.value)}
-            >
-              <option value="general">General practice</option>
-              {state.targets.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <button
-              className="button secondary small"
-              disabled={!!busy || !ready}
-              onClick={() => setEditor({})}
-            >
-              Create preparation group
-            </button>
+        {/* Hidden while a form is open, so only one choice is in view. */}
+        {!editor && (
+          <div className="form">
+            <label htmlFor="preparation-target">Preparing for…</label>
+            <div className="actions">
+              <select
+                id="preparation-target"
+                className="prep-select"
+                value={selected}
+                disabled={!!busy || !ready}
+                onChange={(e) => choose(e.target.value)}
+              >
+                <option value="general">General practice</option>
+                {roles.length > 0 && (
+                  <optgroup label="Roles">
+                    {roles.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {groups.length > 0 && (
+                  <optgroup label="Groups">
+                    {groups.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              <button
+                className="button secondary small"
+                disabled={!!busy || !ready}
+                onClick={() => setEditor({ mode: "role" })}
+              >
+                Prepare for a role
+              </button>
+              <button
+                className="button secondary small"
+                disabled={!!busy || !ready}
+                onClick={() => setEditor({ mode: "group" })}
+              >
+                Create a group
+              </button>
+            </div>
+            {target && isGroup && (
+              <p className="tiny muted">
+                Roles:{" "}
+                {target.jobIds
+                  .map((id) => {
+                    const job = workspace.jobs.find((j) => j.id === id);
+                    return job
+                      ? `${job.company} · ${job.role}`
+                      : "Deleted application";
+                  })
+                  .join(" / ")}
+              </p>
+            )}
           </div>
-          {target && (
-            <p className="tiny muted">
-              {target.jobIds
-                .map((id) => {
-                  const job = workspace.jobs.find((j) => j.id === id);
-                  return job
-                    ? `${job.company} · ${job.role}`
-                    : "Deleted application";
-                })
-                .join(" / ")}
-            </p>
-          )}
-        </div>
+        )}
         {error && (
           <div className="notice error" role="alert">
             {error}
@@ -516,14 +546,22 @@ export function PreparationWorkspace(props: Props) {
             )}
           </p>
         )}
-        {editor && (
+        {editor?.mode === "role" && (
+          <RolePicker
+            jobs={workspace.jobs}
+            busy={!!busy}
+            onCancel={() => setEditor(null)}
+            onPick={(jobId) => void prepareForJob(jobId)}
+          />
+        )}
+        {editor?.mode === "group" && (
           <TargetEditor
             target={editor.target}
             jobs={workspace.jobs}
             busy={!!busy}
             onCancel={() => setEditor(null)}
             onSave={(value) =>
-              void work("Saving target…", async () => {
+              void work("Saving group…", async () => {
                 const saved = await saveTarget(value);
                 choose(saved.id, saved);
               })
@@ -533,19 +571,21 @@ export function PreparationWorkspace(props: Props) {
         {target && !editor && (
           <>
             <div className="actions prep-toolbar">
-              <button
-                className="button secondary small"
-                disabled={!!busy}
-                onClick={() => setEditor({ target })}
-              >
-                Edit target
-              </button>
+              {isGroup && (
+                <button
+                  className="button secondary small"
+                  disabled={!!busy}
+                  onClick={() => setEditor({ mode: "group", target })}
+                >
+                  Edit group
+                </button>
+              )}
               <button
                 className="button danger small"
                 disabled={!!busy}
                 onClick={() => setConfirmDelete(true)}
               >
-                Delete target
+                {isGroup ? "Delete group" : "Delete preparation"}
               </button>
               {versions.length > 0 && (
                 <label className="tiny">
@@ -676,7 +716,7 @@ export function PreparationWorkspace(props: Props) {
       )}
       {confirmDelete && target && (
         <Dialog
-          title="Delete this target?"
+          title={isGroup ? "Delete this group?" : "Delete this preparation?"}
           close={() => {
             if (!busy) setConfirmDelete(false);
           }}
@@ -688,8 +728,10 @@ export function PreparationWorkspace(props: Props) {
           )}
           <ConfirmDeleteBody
             busy={!!busy}
-            confirmLabel="Delete target and progress"
-            consequence="This deletes the target, all its plan versions, and their progress. Applications and earlier analysis tasks remain."
+            confirmLabel={
+              isGroup ? "Delete group and progress" : "Delete preparation"
+            }
+            consequence={`This deletes ${isGroup ? "the group" : "this role's preparation"}, all its plan versions, and their progress. Applications and earlier analysis tasks remain.`}
             onConfirm={() => void deleteTarget()}
             onCancel={() => setConfirmDelete(false)}
           />

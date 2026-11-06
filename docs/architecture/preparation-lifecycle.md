@@ -54,8 +54,8 @@ stateDiagram-v2
   Active --> Active: Autosave notes and scores, or save completion
   Active --> Previous: A replacement version is activated
   Previous --> Previous: Inspect saved version and progress read-only
-  Active --> [*]: Delete target
-  Previous --> [*]: Delete target
+  Active --> [*]: Delete group or preparation
+  Previous --> [*]: Delete group or preparation
   note right of Draft
     Failed activation retains the draft.
     Existing active versions remain available.
