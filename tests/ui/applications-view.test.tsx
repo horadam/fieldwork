@@ -159,3 +159,13 @@ describe("ApplicationsView", () => {
     ).toBeNull();
   });
 });
+
+it("advances a fresh analysis to plan creation", () => {
+  const run = completedRun();
+  run.jd_snapshot = job.jd;
+  const handlers = setup({ workspace: workspace([run]) });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Create preparation plan" }),
+  );
+  expect(handlers.onPrepare).toHaveBeenCalledWith(job);
+});

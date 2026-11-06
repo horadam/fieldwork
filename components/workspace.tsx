@@ -69,6 +69,11 @@ export default function Workspace() {
     null,
   );
   const [planSummaries, setPlanSummaries] = useState<PlanSummary[]>([]);
+  const [prepContext, setPrepContext] = useState<{
+    name: string;
+    next: string;
+    targetId: string;
+  } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const navigated = useRef(false);
   const current = tabById(tab);
@@ -156,7 +161,9 @@ export default function Workspace() {
                 : current.label}
             </div>
             <h1 ref={heading} tabIndex={-1}>
-              {current.title}
+              {tab === "study" && prepContext
+                ? `Preparation for ${prepContext.name}`
+                : current.title}
             </h1>
             <p className="sub">{current.subtitle}</p>
           </div>
@@ -208,6 +215,11 @@ export default function Workspace() {
 
         {tab === "overview" && (
           <OverviewView
+            context={prepContext}
+            onContinue={() => {
+              if (prepContext) setPreparationTarget(prepContext.targetId);
+              navigate("study");
+            }}
             data={ws.data}
             planSummaries={planSummaries}
             studyDone={studyDone}
@@ -258,6 +270,8 @@ export default function Workspace() {
         {/* Stays mounted across tabs so unsaved preparation edits survive. */}
         <PreparationWorkspace
           key={`${ws.mode}:${ws.email}`}
+          onNavigate={navigate}
+          onContext={setPrepContext}
           section={tab}
           workspace={ws.data}
           token={ws.token}

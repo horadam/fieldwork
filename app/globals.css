@@ -1374,3 +1374,29 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 .card > h2 + .meta + * {
   margin-top: var(--space-3);
 }
+
+/* Preparation flow: the next action stays visible during long reviews. */
+.prep-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  list-style: none;
+  padding: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.prep-steps [aria-current="step"] {
+  font-weight: 700;
+  color: var(--ink);
+}
+.review-actions {
+  position: sticky;
+  bottom: 0;
+  padding: var(--space-3);
+  background: var(--paper, #f6f5ee);
+  border-top: 1px solid var(--line);
+  z-index: 2;
+}
+.prep-review details > fieldset {
+  margin-top: var(--space-3);
+}

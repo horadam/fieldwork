@@ -8,7 +8,7 @@ import {
   type Workspace as Data,
 } from "@/lib/domain";
 import { usageLabel } from "@/lib/pricing";
-import type { PlanSummary } from "@/lib/preparation-plan";
+import { matchingRun, type PlanSummary } from "@/lib/preparation-plan";
 import { signupsOpen } from "@/lib/deployment";
 import type { AiStatus } from "./hooks/use-ai-status";
 import { CostHint } from "./ui/cost-hint";
@@ -168,6 +168,30 @@ export function ApplicationsView({
     </button>
   );
 
+  const activePrep = preparation.find(
+    (p) => p.jobIds.includes(job?.id ?? "") && p.plan,
+  );
+  const fresh = job && matchingRun(job.id, workspace);
+  const nextAction =
+    job &&
+    (activePrep ? (
+      <button
+        className="button green"
+        onClick={() => onOpenTarget(activePrep.targetId)}
+      >
+        Continue preparation
+      </button>
+    ) : fresh ? (
+      <button
+        className="button green"
+        disabled={busy}
+        onClick={() => onPrepare(job)}
+      >
+        Create preparation plan
+      </button>
+    ) : (
+      analyzeButton
+    ));
   return (
     <div className="apps">
       <section className="apps-list" aria-label="Applications">
@@ -215,10 +239,15 @@ export function ApplicationsView({
               {job.notes && <p className="tiny muted">{job.notes}</p>}
             </div>
             <div className="actions">
-              {analyzeButton}
+              {nextAction}
               <OverflowMenu
                 label="More actions"
                 items={[
+                  {
+                    label: "Re-run fit analysis",
+                    onSelect: () => onAnalyze(job),
+                    disabled: busy || !aiReady,
+                  },
                   {
                     label: "Prepare for this job",
                     onSelect: () => onPrepare(job),
@@ -305,7 +334,7 @@ export function ApplicationsView({
                   Compare this job description with your confirmed experience.
                   The analysis shows which requirements your experience meets.
                 </p>
-                {analyzeButton}
+                {nextAction}
               </div>
             )}
 

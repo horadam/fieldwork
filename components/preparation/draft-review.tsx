@@ -121,73 +121,91 @@ export function DraftReview({
             </div>
           </details>
         ))}
+        <p className="notice">
+          {draft.output.questions.length} questions ·{" "}
+          {draft.output.activities.length - draft.excludedActivityIds.length}{" "}
+          selected activities ·{" "}
+          {schedule
+            ? `${Number((schedule.used / 60).toFixed(1))} hours scheduled`
+            : "Choose valid timing"}
+          . Expand an activity to edit it.
+        </p>
         <h3>Activities</h3>
         {draft.output.activities.map((a, index) => (
-          <fieldset
-            className="prep-activity form"
-            key={a.id}
-            aria-label={`Activity ${index + 1}: ${a.title}`}
-          >
-            <label className="prep-member">
-              <input
-                type="checkbox"
-                checked={!draft.excludedActivityIds.includes(a.id)}
-                onChange={(e) =>
-                  onChange({
-                    ...draft,
-                    excludedActivityIds: e.target.checked
-                      ? draft.excludedActivityIds.filter((id) => id !== a.id)
-                      : [...draft.excludedActivityIds, a.id],
-                  })
-                }
-              />
-              Include activity {index + 1}
-            </label>
-            <label>
-              Title
-              <input
-                maxLength={200}
-                value={a.title}
-                onChange={(e) => setActivity(index, { title: e.target.value })}
-              />
-            </label>
-            <label>
-              Instructions
-              <textarea
-                maxLength={1500}
-                value={a.detail}
-                onChange={(e) => setActivity(index, { detail: e.target.value })}
-              />
-            </label>
-            <div className="twocol">
-              <label>
-                Minutes
+          <details key={a.id}>
+            <summary>
+              {a.title} · {a.minutes} min
+            </summary>
+            <fieldset
+              className="prep-activity form"
+              key={a.id}
+              aria-label={`Activity ${index + 1}: ${a.title}`}
+            >
+              <label className="prep-member">
                 <input
-                  type="number"
-                  min={5}
-                  max={120}
-                  value={a.minutes}
+                  type="checkbox"
+                  checked={!draft.excludedActivityIds.includes(a.id)}
                   onChange={(e) =>
-                    setActivity(index, { minutes: Number(e.target.value) })
+                    onChange({
+                      ...draft,
+                      excludedActivityIds: e.target.checked
+                        ? draft.excludedActivityIds.filter((id) => id !== a.id)
+                        : [...draft.excludedActivityIds, a.id],
+                    })
+                  }
+                />
+                Include activity {index + 1}
+              </label>
+              <label>
+                Title
+                <input
+                  maxLength={200}
+                  value={a.title}
+                  onChange={(e) =>
+                    setActivity(index, { title: e.target.value })
                   }
                 />
               </label>
               <label>
-                Priority
-                <select
-                  value={a.priority}
+                Instructions
+                <textarea
+                  maxLength={1500}
+                  value={a.detail}
                   onChange={(e) =>
-                    setActivity(index, { priority: Number(e.target.value) })
+                    setActivity(index, { detail: e.target.value })
                   }
-                >
-                  {[1, 2, 3].map((n) => (
-                    <option key={n}>{n}</option>
-                  ))}
-                </select>
+                />
               </label>
-            </div>
-            <SourceList refs={a.refs} plan={draft} />
-          </fieldset>
+              <div className="twocol">
+                <label>
+                  Minutes
+                  <input
+                    type="number"
+                    min={5}
+                    max={120}
+                    value={a.minutes}
+                    onChange={(e) =>
+                      setActivity(index, { minutes: Number(e.target.value) })
+                    }
+                  />
+                </label>
+                <label>
+                  Priority
+                  <select
+                    value={a.priority}
+                    onChange={(e) =>
+                      setActivity(index, { priority: Number(e.target.value) })
+                    }
+                  >
+                    {[1, 2, 3].map((n) => (
+                      <option key={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <SourceList refs={a.refs} plan={draft} />
+            </fieldset>
+          </details>
         ))}
         <h3>Schedule preview</h3>
         {schedule ? (
@@ -258,13 +276,13 @@ export function DraftReview({
         ) : (
           <p>Choose valid dates and weekly hours to preview the schedule.</p>
         )}
-        <div className="actions">
+        <div className="actions review-actions">
           <button
             className="button accent"
             disabled={busy || !schedule}
             onClick={onActivate}
           >
-            Activate plan
+            Start using this plan
           </button>
           <button
             className="button secondary"
@@ -275,8 +293,8 @@ export function DraftReview({
           </button>
         </div>
         <p className="tiny muted">
-          Activation preserves earlier versions and starts fresh progress.
-          Failed saves retain this review.
+          Starting this plan preserves earlier versions and begins fresh
+          progress. Failed saves retain this review.
         </p>
       </fieldset>
     </section>

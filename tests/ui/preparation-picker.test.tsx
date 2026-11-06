@@ -78,7 +78,10 @@ describe("Preparing for…", () => {
     fireEvent.change(select, { target: { value: "job:job-2" } });
     expect(screen.queryByLabelText(/Actions for/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Remove|Delete/ })).toBeNull();
-    expect(document.body.textContent).toContain("Create your preparation plan");
+    expect(
+      screen.getByRole("button", { name: "Run real analysis" }),
+    ).toBeTruthy();
+    expect(screen.queryByLabelText("Available hours per week")).toBeNull();
     // Nothing is saved just by choosing a role.
     expect(
       JSON.parse(localStorage.getItem("fieldwork-preparation-v1")!).targets,

@@ -44,7 +44,40 @@ export function PlanPractice({
           ))}
         </select>
       </label>
+      <p className="tiny muted">
+        Question {plan.output.questions.indexOf(question) + 1} of{" "}
+        {plan.output.questions.length}
+      </p>
       <h2>{question.text}</h2>
+      <div className="actions">
+        <button
+          className="button secondary small"
+          disabled={plan.output.questions.indexOf(question) === 0}
+          onClick={() =>
+            onQuestion(
+              plan.output.questions[plan.output.questions.indexOf(question) - 1]
+                .id,
+            )
+          }
+        >
+          Previous question
+        </button>
+        <button
+          className="button secondary small"
+          disabled={
+            plan.output.questions.indexOf(question) ===
+            plan.output.questions.length - 1
+          }
+          onClick={() =>
+            onQuestion(
+              plan.output.questions[plan.output.questions.indexOf(question) + 1]
+                .id,
+            )
+          }
+        >
+          Next question
+        </button>
+      </div>
       <SourceList refs={question.refs} plan={plan} />
       <details>
         <summary>Suggested answer outline</summary>

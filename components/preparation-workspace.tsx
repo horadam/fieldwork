@@ -38,6 +38,10 @@ import {
 
 type Props = {
   section: TabId;
+  onNavigate?: (tab: TabId) => void;
+  onContext?: (
+    context: { name: string; next: string; targetId: string } | null,
+  ) => void;
   workspace: Workspace;
   token: string;
   scope: string;
@@ -217,6 +221,26 @@ export function PreparationWorkspace(props: Props) {
     ? schedulePlan(plan.output, plan.settings, plan.excludedActivityIds)
     : null;
   const problems = target ? sourceProblems(target, workspace) : [];
+
+  const nextActivity = schedule?.weeks
+    .flatMap((w) => w.activityIds)
+    .find((id) => !progress?.done[id]);
+  useEffect(() => {
+    props.onContext?.(
+      target
+        ? {
+            name: target.name,
+            targetId: target.id,
+            next:
+              plan?.output.activities.find((a) => a.id === nextActivity)
+                ?.title ||
+              (plan
+                ? "Review your preparation"
+                : "Create your preparation plan"),
+          }
+        : null,
+    );
+  }, [selected, plan?.id, nextActivity, ready]);
 
   async function work(label: string, action: () => Promise<void>) {
     setBusy(label);
@@ -471,6 +495,10 @@ export function PreparationWorkspace(props: Props) {
       disabled: !!busy || readOnly,
       savingId: savingActivity,
       onToggle: toggleActivity,
+      onPractice: (ids: string[]) => {
+        setQuestionId(ids[0]);
+        props.onNavigate?.("practice");
+      },
     };
   return (
     <section className="preparation-workspace">
@@ -634,6 +662,21 @@ export function PreparationWorkspace(props: Props) {
                 remain available; generate and review a new version when ready.
               </p>
             )}
+            {!plan && (
+              <ol className="prep-steps" aria-label="Preparation steps">
+                <li aria-current={problems.length ? "step" : undefined}>
+                  1. Check requirements
+                </li>
+                <li
+                  aria-current={!problems.length && !draft ? "step" : undefined}
+                >
+                  2. Set available time
+                </li>
+                <li aria-current={draft ? "step" : undefined}>
+                  3. Review plan
+                </li>
+              </ol>
+            )}
             {problems.map((problem) => (
               <div className="notice" key={problem.jobId}>
                 <p>{problem.message}</p>
@@ -652,32 +695,38 @@ export function PreparationWorkspace(props: Props) {
                 )}
               </div>
             ))}
-            <details open={!plan && !draft}>
-              <summary>
-                {plan ? "Generate new version" : "Create your preparation plan"}
-              </summary>
-              <p className="tiny muted">
-                One explicit call with {props.provider}. Review before
-                activation. Existing plans are never replaced automatically.
-              </p>
-              <TimingFields
-                value={settings}
-                onChange={setSettings}
-                disabled={!!busy}
-              />
-              <button
-                className="button"
-                disabled={!!busy || problems.length > 0}
-                onClick={() => void generate()}
-              >
-                Generate {plan ? "new version" : "preparation plan"}
-              </button>
-              <CostHint
-                ai={props.ai ?? null}
-                step="preparation"
-                sourceChars={sourceChars(workspace, target.jobIds)}
-              />
-            </details>
+            {!problems.length && (
+              <details open={!plan && !draft}>
+                <summary>
+                  {plan
+                    ? "Generate new version"
+                    : "Create your preparation plan"}
+                </summary>
+                <p className="tiny muted">
+                  Choose your time budget. You can edit the generated plan
+                  before using it.
+                  {plan &&
+                    " Your current plan stays available until you choose its replacement."}
+                </p>
+                <TimingFields
+                  value={settings}
+                  onChange={setSettings}
+                  disabled={!!busy}
+                />
+                <button
+                  className="button"
+                  disabled={!!busy || problems.length > 0}
+                  onClick={() => void generate()}
+                >
+                  Generate {plan ? "new version" : "preparation plan"}
+                </button>
+                <CostHint
+                  ai={props.ai ?? null}
+                  step="preparation"
+                  sourceChars={sourceChars(workspace, target.jobIds)}
+                />
+              </details>
+            )}
           </>
         )}
       </div>
@@ -692,6 +741,7 @@ export function PreparationWorkspace(props: Props) {
       )}
       {target && plan && checklist && (
         <>
+          <h2>Preparation for {target.name}</h2>
           <div className="notice">
             {readOnly ? "Previous version · read-only" : "Active plan"} ·{" "}
             {plan.settings.startDate} · {plan.metadata.provider} /{" "}
@@ -715,10 +765,10 @@ export function PreparationWorkspace(props: Props) {
           )}
         </>
       )}
-      {target && !plan && !draft && (
+      {target && !plan && !draft && !problems.length && (
         <p className="notice">
-          No active plan yet. Complete the source analyses, choose your time
-          budget, then generate and review a plan.
+          Your questions and schedule will appear here after you review and
+          start your plan.
         </p>
       )}
       {target && props.section === "study" && (

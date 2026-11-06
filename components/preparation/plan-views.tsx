@@ -17,6 +17,7 @@ type Checklist = {
   disabled: boolean;
   savingId: string | null;
   onToggle: (id: string, done: boolean) => void;
+  onPractice?: (questionIds: string[], activityId: string) => void;
 };
 const activityTypes = [
   "study",
@@ -169,6 +170,7 @@ export function EarlierTasks({
   workspace: Workspace;
   savingTask: string | null;
   onToggle: (id: string, done: boolean) => void;
+  onPractice?: (questionIds: string[], activityId: string) => void;
 }) {
   const tasks = workspace.tasks.filter((task) =>
     workspace.runs.some(

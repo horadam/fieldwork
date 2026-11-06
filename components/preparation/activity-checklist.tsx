@@ -20,6 +20,7 @@ export function ActivityChecklist({
   disabled,
   savingId,
   onToggle,
+  onPractice,
 }: {
   plan: PreparationPlanVersion;
   ids: string[];
@@ -28,6 +29,7 @@ export function ActivityChecklist({
   // Only the activity being saved is disabled.
   savingId?: string | null;
   onToggle: (id: string, done: boolean) => void;
+  onPractice?: (questionIds: string[], activityId: string) => void;
 }) {
   if (!ids.length) return <p className="tiny muted">No matching activities.</p>;
   return (
@@ -35,8 +37,9 @@ export function ActivityChecklist({
       {ids.map((id) => {
         const activity = plan.output.activities.find((a) => a.id === id)!;
         return (
-          <label className="check" key={id}>
+          <div className="check" key={id}>
             <input
+              aria-label={`Complete ${activity.title}`}
               type="checkbox"
               disabled={disabled || savingId === id}
               checked={progress.done[id] || false}
@@ -60,15 +63,35 @@ export function ActivityChecklist({
                   <ul className="bullets tiny">
                     {activity.questionIds.map((q) => (
                       <li key={q}>
-                        {plan.output.questions.find((x) => x.id === q)?.text}
+                        {onPractice ? (
+                          <button
+                            className="link"
+                            onClick={() => onPractice([q], id)}
+                          >
+                            {
+                              plan.output.questions.find((x) => x.id === q)
+                                ?.text
+                            }
+                          </button>
+                        ) : (
+                          plan.output.questions.find((x) => x.id === q)?.text
+                        )}
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
+              {onPractice && activity.questionIds.length > 0 && (
+                <button
+                  className="button secondary small"
+                  onClick={() => onPractice(activity.questionIds, id)}
+                >
+                  Practice this activity’s questions
+                </button>
+              )}
               <SourceList refs={activity.refs} plan={plan} />
             </div>
-          </label>
+          </div>
         );
       })}
     </>
