@@ -272,6 +272,7 @@ export function ApplicationsView({
     </button>
   );
 
+  // Shown only on the Prep plan tab, below the questions and tasks it approves.
   const approveBar = run?.output && (
     <div className="approve-bar">
       <p className="tiny">
@@ -280,14 +281,6 @@ export function ApplicationsView({
           : `Draft plan: ${run.output.questions.length} questions, ${run.output.tasks.length} study tasks. Nothing is saved until you approve.`}
       </p>
       <div className="actions">
-        {section !== "plan" && (
-          <button
-            className="button secondary"
-            onClick={() => setSection("plan")}
-          >
-            Review plan
-          </button>
-        )}
         <button
           className="button accent"
           disabled={busy || approved}
@@ -473,7 +466,6 @@ export function ApplicationsView({
                   </p>
                 )}
                 {run.output && <FitResult run={run} output={run.output} />}
-                {approveBar}
               </>
             )}
 

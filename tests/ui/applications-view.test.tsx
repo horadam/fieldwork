@@ -85,6 +85,10 @@ describe("ApplicationsView", () => {
     });
     expect(screen.getByText("requirements fully met")).toBeTruthy();
     expect(screen.getAllByText("Met").length).toBeGreaterThan(0);
+    // Approval belongs with the tasks it saves, on the Prep plan tab.
+    expect(screen.queryByRole("button", { name: "Approve plan" })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Prep plan" }));
+    expect(screen.getByText("Proposed study tasks")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Approve plan" }));
     expect(handlers.onApprove).toHaveBeenCalledWith(run);
   });
