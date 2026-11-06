@@ -59,7 +59,7 @@ export const tabs: {
     label: "Preparation tasks",
     icon: "M4 12l5 5L20 6",
     title: "Turn insight into action.",
-    subtitle: "Only plans you explicitly approve appear here.",
+    subtitle: "The activities in your preparation plans, week by week.",
   },
 ];
 

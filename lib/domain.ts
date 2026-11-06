@@ -124,25 +124,6 @@ export function validateAnalysis(
   return out;
 }
 
-export function approveLocal(state: Workspace, run: Run): Workspace {
-  if (run.status !== "completed" || !run.output)
-    throw new Error("Only completed analyses can be approved");
-  if (state.tasks.some((t) => t.run_id === run.id)) return state;
-  return {
-    ...state,
-    tasks: [
-      ...state.tasks,
-      ...run.output.tasks.map((t, i) => ({
-        id: `${run.id}-${i}`,
-        run_id: run.id,
-        title: t.title,
-        detail: t.detail,
-        done: false,
-      })),
-    ],
-  };
-}
-
 export type FitCoverage = Record<
   Analysis["requirements"][number]["status"],
   number

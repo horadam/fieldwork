@@ -1,15 +1,18 @@
 "use client";
 import type { Workspace } from "@/lib/domain";
+import type { PlanSummary } from "@/lib/preparation-plan";
 import { agendaMinutes, overviewSteps } from "@/lib/sample-practice";
 import type { TabId } from "../shell/tabs";
 
 export function OverviewView({
   data,
+  planSummaries,
   studyDone,
   studyTotal,
   onNavigate,
 }: {
   data: Workspace;
+  planSummaries: PlanSummary[];
   studyDone: number;
   studyTotal: number;
   onNavigate: (tab: TabId) => void;
@@ -47,8 +50,11 @@ export function OverviewView({
           <span>Experience records</span>
         </div>
         <div className="stat">
-          <strong>{data.tasks.filter((t) => !t.done).length}</strong>
-          <span>Approved tasks to work on</span>
+          <strong>
+            {planSummaries.reduce((n, s) => n + (s.plan?.remaining ?? 0), 0) +
+              data.tasks.filter((t) => !t.done).length}
+          </strong>
+          <span>Preparation tasks to do</span>
         </div>
       </div>
       <div className="grid">

@@ -1,10 +1,4 @@
-import {
-  approveLocal,
-  type Experience,
-  type Job,
-  type Run,
-  type Workspace,
-} from "../domain";
+import { type Experience, type Job, type Run, type Workspace } from "../domain";
 import { importLocal, type ImportBatch } from "../resume";
 import { seed } from "../seed";
 import type { Request } from "../api-client";
@@ -29,7 +23,6 @@ export interface WorkspaceStore {
   ): Promise<Workspace>;
   remove(current: Workspace, entity: Entity, id: string): Promise<Workspace>;
   importExperience(current: Workspace, batch: ImportBatch): Promise<Workspace>;
-  approve(current: Workspace, run: Run): Promise<Workspace>;
   setTaskDone(
     current: Workspace,
     id: string,
@@ -142,9 +135,6 @@ export function browserStore(storage: () => Storage): WorkspaceStore {
         experience: importLocal(current.experience, batch),
       });
     },
-    async approve(current, run) {
-      return commit(approveLocal(current, run));
-    },
     async setTaskDone(current, id, done) {
       return commit(withTaskDone(current, id, done));
     },
@@ -178,10 +168,6 @@ export function accountStore(request: Request): WorkspaceStore {
     },
     async importExperience(_current, batch) {
       await request("/api/experience/import", { body: batch });
-      return load();
-    },
-    async approve(_current, run) {
-      await request("/api/approve", { body: { runId: run.id } });
       return load();
     },
     // A checkbox needs no full reload; the caller has already shown the change.

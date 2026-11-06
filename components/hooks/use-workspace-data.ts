@@ -238,9 +238,6 @@ export function useWorkspaceData() {
       }
     });
   }
-  const approve = (run: Run) =>
-    act(() => apply(store.approve(dataRef.current, run)));
-
   // Shown at once and saved in the background; only this task reverts on
   // failure, and other checkboxes stay usable meanwhile.
   const [savingTask, setSavingTask] = useState<string | null>(null);
@@ -310,7 +307,6 @@ export function useWorkspaceData() {
     importExperience,
     importJob,
     runJob,
-    approve,
     toggleTask,
     authenticate,
     signOut,

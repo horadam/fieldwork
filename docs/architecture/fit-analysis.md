@@ -83,12 +83,17 @@ sequenceDiagram
 - Browser abort requests and backend cancellation signals are best effort. They
   cannot undo committed writes or guarantee that all provider computation stops.
 
-The analysis itself creates no approved tasks. **Approve plan** in the
-approve bar under the Fit analysis and Prep plan tabs uses the earlier approval path (`/api/approve` or `approveLocal`),
-copying proposed tasks idempotently into earlier analysis tasks. The newer
-[preparation lifecycle](preparation-lifecycle.md) is a separate generation and
-activation flow and requires real, current analyses; it does not require that
-earlier task approval first.
+The analysis creates no tasks. Its proposed questions and tasks are inputs to
+the [preparation lifecycle](preparation-lifecycle.md), which requires real,
+current analyses. The **Prep plan** tab shows the job's preparation targets and
+their active plans (via `planSummaries()`), or offers **Prepare for this job**.
+
+An earlier flow let users approve an analysis's tasks directly into a task list.
+It was retired on 2026-11-05: the `/api/approve` route, `approveLocal` and the
+approve button are gone. Tasks approved before then remain in
+`preparation_tasks` and stay usable under Preparation tasks. The
+`approve_analysis` database function from migration 001 still exists but is
+unused; applied migrations are not edited.
 
 ## Implementation
 
@@ -98,7 +103,6 @@ earlier task approval first.
 - [Account route](../../app/api/analyze/route.ts),
   [browser-workspace route](../../app/api/analyze/local/route.ts),
   [agent](../../lib/agent.ts), [provider adapter](../../lib/ai-provider.ts),
-  [usage recording](model-calls.md), and
-  [earlier task approval](../../app/api/approve/route.ts).
+  and [usage recording](model-calls.md).
 - [Initial database functions](../../supabase/migrations/001_workspace.sql) and
   [current reservation/provider update](../../supabase/migrations/002_resume_import.sql).

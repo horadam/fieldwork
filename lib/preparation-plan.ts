@@ -437,3 +437,46 @@ export function validateProgress(raw: unknown, plan: PreparationPlanVersion) {
     throw new Error("Invalid preparation progress.");
   return p;
 }
+
+// What Applications and the Overview show about each preparation target:
+// whether it has an active plan, and how much of its scheduled work is left.
+export type PlanSummary = {
+  targetId: string;
+  name: string;
+  jobIds: string[];
+  plan: {
+    createdAt: string;
+    questions: number;
+    scheduled: number;
+    remaining: number;
+  } | null;
+};
+export function planSummaries(state: PreparationState): PlanSummary[] {
+  return state.targets.map((target) => {
+    const plan = state.plans.find((p) => p.id === target.activeVersionId);
+    if (!plan)
+      return {
+        targetId: target.id,
+        name: target.name,
+        jobIds: target.jobIds,
+        plan: null,
+      };
+    const done = state.progress.find((p) => p.planId === plan.id)?.done ?? {};
+    const scheduled = schedulePlan(
+      plan.output,
+      plan.settings,
+      plan.excludedActivityIds,
+    ).weeks.flatMap((w) => w.activityIds);
+    return {
+      targetId: target.id,
+      name: target.name,
+      jobIds: target.jobIds,
+      plan: {
+        createdAt: plan.createdAt,
+        questions: plan.output.questions.length,
+        scheduled: scheduled.length,
+        remaining: scheduled.filter((id) => !done[id]).length,
+      },
+    };
+  });
+}

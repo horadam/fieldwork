@@ -37,7 +37,7 @@ function setup(
     onPrepare: vi.fn(),
     onEdit: vi.fn(),
     onDelete: vi.fn(),
-    onApprove: vi.fn(),
+    onOpenTarget: vi.fn(),
     onAdd: vi.fn(),
   };
   render(
@@ -77,20 +77,52 @@ describe("ApplicationsView", () => {
     expect(screen.getByText(/model/i, { selector: "p" })).toBeTruthy();
   });
 
-  it("shows coverage for a real run and approves its plan", () => {
+  it("shows coverage for a real run, with no approval step", () => {
     const run = completedRun();
-    const handlers = setup({
-      workspace: workspace([run]),
-      selectedRun: run.id,
-    });
+    setup({ workspace: workspace([run]), selectedRun: run.id });
     expect(screen.getByText("requirements fully met")).toBeTruthy();
     expect(screen.getAllByText("Met").length).toBeGreaterThan(0);
-    // Approval belongs with the tasks it saves, on the Prep plan tab.
     expect(screen.queryByRole("button", { name: "Approve plan" })).toBeNull();
+  });
+
+  it("offers to prepare when the job has no preparation plan", () => {
+    const handlers = setup();
     fireEvent.click(screen.getByRole("tab", { name: "Prep plan" }));
-    expect(screen.getByText("Proposed study tasks")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Approve plan" }));
-    expect(handlers.onApprove).toHaveBeenCalledWith(run);
+    expect(screen.getByText("No preparation plan yet")).toBeTruthy();
+    expect(document.body.textContent).toContain(
+      "It needs a completed real analysis first.",
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Prepare for this job" }),
+    );
+    expect(handlers.onPrepare).toHaveBeenCalledWith(job);
+  });
+
+  it("shows the job's preparation plan and opens it", () => {
+    const handlers = setup({
+      preparation: [
+        {
+          targetId: "t1",
+          name: "Example SaaS · Engineer",
+          jobIds: [job.id],
+          plan: {
+            createdAt: "2026-11-05T10:00:00.000Z",
+            questions: 5,
+            scheduled: 8,
+            remaining: 3,
+          },
+        },
+        { targetId: "t2", name: "Other job", jobIds: ["other"], plan: null },
+      ],
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Prep plan" }));
+    expect(screen.getByText("Example SaaS · Engineer")).toBeTruthy();
+    expect(document.body.textContent).toContain(
+      "5 questions · 3 of 8 scheduled activities left",
+    );
+    expect(screen.queryByText("Other job")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Open preparation" }));
+    expect(handlers.onOpenTarget).toHaveBeenCalledWith("t1");
   });
 
   it("moves between detail tabs with the arrow keys", () => {
