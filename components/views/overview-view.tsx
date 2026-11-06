@@ -85,30 +85,32 @@ export function OverviewView({
             Six hours building, four practicing, two studying. Keep the feature
             scope small and the learning deliberate.
           </p>
-          <div className="progress">
-            <span
-              style={{
-                width: `${studyTotal ? (studyDone / studyTotal) * 100 : 0}%`,
-              }}
-            />
+          {/* Label and bar form one unit, so the bar reads as a meter. */}
+          <div className="meter">
+            <p className="tiny muted" id="study-progress-label">
+              {studyDone} of {studyTotal} general study blocks completed
+            </p>
+            <div
+              className="progress"
+              role="progressbar"
+              aria-labelledby="study-progress-label"
+              aria-valuemin={0}
+              aria-valuemax={studyTotal}
+              aria-valuenow={studyDone}
+            >
+              <span
+                style={{
+                  width: `${studyTotal ? (studyDone / studyTotal) * 100 : 0}%`,
+                }}
+              />
+            </div>
           </div>
-          <p className="tiny muted">
-            {studyDone} of {studyTotal} general study blocks completed
-          </p>
           <button
             className="button secondary"
             onClick={() => onNavigate("study")}
           >
             Open study plan
           </button>
-          <details style={{ marginTop: 22 }}>
-            <summary>What makes a strong answer?</summary>
-            <p className="tiny">
-              Problem → your responsibility → decision and alternative →
-              implementation → evidence → lesson. State shared ownership
-              precisely.
-            </p>
-          </details>
         </section>
       </div>
     </>

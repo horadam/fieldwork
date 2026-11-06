@@ -25,6 +25,11 @@ Non-obvious things this project has taught its contributors, human or agent. Rea
 - **Create the browser Supabase client once per page.** React runs effects twice in development, and Fast Refresh remounts components, so `createClient` inside an effect makes several clients on the same session ("Multiple GoTrueClient instances"). Use `browserSupabase()` in `lib/supabase-browser.ts`. (2026-11-05)
 - **The built-in mailer is for testing.** It sends a handful of emails per hour, only to members of the Supabase organization, so open sign-up on a public site needs custom SMTP. (2026-11-05)
 
+## UI and CSS
+
+- **Tailwind's base styles strip list markers.** `ul`/`ol` render without bullets or numbers unless a class sets `list-style` again; `.bullets` does. (2026-11-06)
+- **The spacing flow rule only covers listed containers.** A new container that holds stacked content (a `fieldset`, a task body) needs adding to the `* + *` rule in `app/globals.css`, or its children touch. (2026-11-06)
+
 ## Model calls
 
 - **Constrain IDs in the schema rather than the prompt.** Plans failed validation on invented link IDs until the output schema allowed only real keys (`lib/plan-links.ts`); the plan eval went from 1 to 2 of 3. Prefer enums of valid IDs wherever a model must reference its inputs. (2026-11-05)

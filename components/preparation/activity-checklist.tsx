@@ -3,7 +3,14 @@ import type {
   PreparationPlanVersion,
   PreparationProgress,
 } from "@/lib/preparation-plan";
-import { sourceLabels } from "./labels";
+import { Meta } from "../ui/meta";
+import { SourceList } from "./source-list";
+
+// "coding_design" → "Coding design".
+export const activityLabel = (type: string) => {
+  const words = type.replaceAll("_", " ");
+  return words[0].toUpperCase() + words.slice(1);
+};
 
 // Plan activities as checkboxes; each change saves immediately.
 export function ActivityChecklist({
@@ -37,23 +44,29 @@ export function ActivityChecklist({
             />
             <div>
               <strong>{activity.title}</strong>
-              <p className="tiny muted">
-                {activity.minutes} min · {activity.type.replaceAll("_", " ")} ·
-                Priority {activity.priority}
-              </p>
+              <Meta
+                items={[
+                  `${activity.minutes} min`,
+                  <span className="chip" key="type">
+                    {activityLabel(activity.type)}
+                  </span>,
+                  `Priority ${activity.priority}`,
+                ]}
+              />
               <p>{activity.detail}</p>
-              <p className="tiny muted">{sourceLabels(activity.refs, plan)}</p>
               {activity.questionIds.length > 0 && (
-                <p className="tiny">
-                  Practice questions:{" "}
-                  {activity.questionIds
-                    .map(
-                      (q) =>
-                        plan.output.questions.find((x) => x.id === q)?.text,
-                    )
-                    .join(" / ")}
-                </p>
+                <div>
+                  <p className="list-label">Practice questions</p>
+                  <ul className="bullets tiny">
+                    {activity.questionIds.map((q) => (
+                      <li key={q}>
+                        {plan.output.questions.find((x) => x.id === q)?.text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
+              <SourceList refs={activity.refs} plan={plan} />
             </div>
           </label>
         );
