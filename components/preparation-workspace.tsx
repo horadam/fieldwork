@@ -10,6 +10,7 @@ import { TargetEditor } from "./preparation/target-editor";
 import { OverflowMenu } from "./ui/overflow-menu";
 import { TimingFields } from "./preparation/timing-fields";
 import { DraftReview } from "./preparation/draft-review";
+import { InterviewSession } from "./preparation/interview-session";
 import { PlanPractice } from "./preparation/plan-practice";
 import { EarlierTasks, PlanSchedule } from "./preparation/plan-views";
 import type { Job, Workspace } from "@/lib/domain";
@@ -112,6 +113,13 @@ export function PreparationWorkspace(props: Props) {
   const [draft, setDraft] = useState<PreparationPlanVersion | null>(null);
   const [versionId, setVersionId] = useState("");
   const [questionId, setQuestionId] = useState("");
+  const [practiceMode, setPracticeMode] = useState<"notes" | "interview">(
+    "notes",
+  );
+  const [practiceSelection, setPracticeSelection] = useState<{
+    ids: string[];
+    activityId: string;
+  } | null>(null);
   const [edits, setEdits] = useState<Record<string, PreparationProgress>>({});
   const [saveStatus, setSaveStatus] = useState("");
   const [savingActivity, setSavingActivity] = useState<string | null>(null);
@@ -330,6 +338,8 @@ export function PreparationWorkspace(props: Props) {
 
   function choose(key: string, known?: PreparationTarget) {
     setSelected(key);
+    setPracticeSelection(null);
+    setPracticeMode("notes");
     setVersionId("");
     setQuestionId("");
     setDraft(null);
@@ -495,7 +505,9 @@ export function PreparationWorkspace(props: Props) {
       disabled: !!busy || readOnly,
       savingId: savingActivity,
       onToggle: toggleActivity,
-      onPractice: (ids: string[]) => {
+      onPractice: (ids: string[], activityId: string) => {
+        setPracticeSelection({ ids, activityId });
+        setPracticeMode("interview");
         setQuestionId(ids[0]);
         props.onNavigate?.("practice");
       },
@@ -748,6 +760,43 @@ export function PreparationWorkspace(props: Props) {
             {plan.metadata.model}
           </div>
           {props.section === "practice" && (
+            <div className="actions" role="group" aria-label="Practice method">
+              <button
+                className="button secondary"
+                aria-pressed={practiceMode === "notes"}
+                onClick={() => setPracticeMode("notes")}
+              >
+                Write notes
+              </button>
+              <button
+                className="button secondary"
+                aria-pressed={practiceMode === "interview"}
+                onClick={() => setPracticeMode("interview")}
+              >
+                Practice with interviewer
+              </button>
+            </div>
+          )}
+          {props.section === "practice" && practiceMode === "interview" && (
+            <InterviewSession
+              key={`${props.scope}:${plan.id}`}
+              plan={plan}
+              token={token}
+              ai={props.ai}
+              questionIds={
+                practiceSelection?.ids || [
+                  questionId || plan.output.questions[0].id,
+                ]
+              }
+              activityId={practiceSelection?.activityId || null}
+              readOnly={readOnly}
+              onComplete={(id) => void toggleActivity(id, true)}
+              activityDone={
+                !!progress?.done[practiceSelection?.activityId || ""]
+              }
+            />
+          )}
+          {props.section === "practice" && practiceMode === "notes" && (
             <PlanPractice
               plan={plan}
               progress={checklist.progress}

@@ -261,3 +261,9 @@ PDF.js 5.6.205 is vendored as a browser-only package because registry access was
 PDF ingestion and inference are separate so parsing errors can be diagnosed without a model call. Portfolio rationale and remaining evaluation work: [CASE-STUDY.md](CASE-STUDY.md).
 
 Preparation navigation follows the selected role: application actions advance from analysis to plan creation to continuing preparation. The Overview shows the selected target and next activity; general samples are secondary. Study activities link directly to their practice questions. Plan review keeps activity editing collapsed and its confirmation action visible.
+
+## Conversational practice
+
+In a job's Interview practice, choose **Practice with interviewer**. Start the selected question or a short mock of up to three questions. **Coach** shows feedback after each answer; **Interview** waits until the end. Each question allows at most two follow-ups. Answers, feedback and repeated attempts are separate from written notes and self-scores. Study activities can open their linked questions directly. Completing a rehearsal remains your decision.
+
+Apply `006_practice_sessions.sql` after migration 005 for account attempt storage and hosted quotas. Browser attempts need no database. Text practice uses the selected Ollama/OpenAI provider, with no fallback. A failed response retains the answer; a failed save offers a save-only retry. See [the session flow and limits](docs/architecture/interview-practice.md). Run `pnpm eval:practice` for synthetic local evaluation; billed comparisons require `--allow-paid`.

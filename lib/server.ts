@@ -186,7 +186,9 @@ export async function inferenceAccess(
 export type InferenceKind =
   | "resume_extraction"
   | "job_extraction"
-  | "preparation_generation";
+  | "preparation_generation"
+  | "practice_turn"
+  | "practice_audio";
 // Hosted (signed-in) calls on the server's key spend the per-hour quota in
 // 005_inference_usage.sql. Calls without an account, or on the user's own
 // key, are not metered here.

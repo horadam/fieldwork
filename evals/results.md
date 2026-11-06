@@ -25,3 +25,11 @@ The first local run (`resume-v3`, `job-import-v1`) passed 5 of 8 resume cases an
 ## Earlier record
 
 A run on 2026-10-21 recorded 0 of 8 resume cases. A sandbox blocked the connection to Ollama, so it measured nothing about model quality. The citation metrics in that record were dropped when citations were removed (migration 003).
+
+## Conversational practice · 2026-11-06
+
+Ran `pnpm eval:practice` locally on Qwen3 8B with four synthetic answers: vague ownership, a concrete tradeoff, an unsupported metric and an instruction-injection answer. The first attempt was blocked by the sandbox; it measured no quality. After network access was granted, both `practice-v1` and revised `practice-v2` completed all four calls with structurally valid output. The v2 median response time was 5.3 seconds. No paid calls were made.
+
+Manual review found important limitations, even after the prompt revision: Qwen still gives vague praise to the unsupported metric and instruction-only answer; it can ask for a tradeoff already explained, and can overemphasize missing quantitative results. It did not invent the requested revenue achievement or award a hiring decision, and the metric follow-up in v2 asked about the baseline. These are observations on four cases, not a quality pass rate. Treat the coach as experimental; human review remains necessary. The dataset and harness are in `evals/practice/` and `scripts/evaluate-practice.ts`. Mocked tests establish bounds, validation and persistence, not semantic accuracy.
+
+New plans use `preparation-v3`: if the model omits linked question practice, a disclosed 15-minute rehearsal is added for review (or an already full plan is rejected). This deterministic coverage correction has regression coverage; it has not been counted as a new model-evaluation result.

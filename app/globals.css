@@ -1400,3 +1400,21 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 .prep-review details > fieldset {
   margin-top: var(--space-3);
 }
+
+.conversation {
+  list-style: none;
+  padding: 0;
+}
+.conversation > li {
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--line);
+}
+.conversation > li > * + * {
+  margin-top: var(--space-3);
+}
+.answer-text {
+  white-space: pre-wrap;
+}
+.interview-session textarea {
+  min-height: 10rem;
+}

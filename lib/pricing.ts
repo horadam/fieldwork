@@ -66,11 +66,17 @@ export function formatCost(usd: number) {
 // Each step's reply limit (its maxTokens) and the tokens its instructions and
 // output schema add on top of the user's text. Instruction sizes were measured
 // on the local evals and rounded up for OpenAI, which also counts the schema.
-export type Step = "resume" | "job" | "analysis" | "preparation";
+export type Step = "resume" | "job" | "analysis" | "preparation" | "practice";
 export const STEPS: Record<
   Step,
   { label: string; maxOutput: number; overhead: number; maxTurns: number }
 > = {
+  practice: {
+    label: "Interview answer",
+    maxOutput: 1800,
+    overhead: 1400,
+    maxTurns: 1,
+  },
   resume: {
     label: "Resume import",
     maxOutput: 6500,
