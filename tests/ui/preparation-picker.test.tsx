@@ -6,6 +6,7 @@ import {
   render,
   screen,
   within,
+  waitFor,
 } from "@testing-library/react";
 import { PreparationWorkspace } from "../../components/preparation-workspace";
 import { defaultSettings, planSources } from "../../lib/preparation-plan";
@@ -169,5 +170,18 @@ describe("Preparing for…", () => {
     expect(items.map((i) => i.textContent)).toEqual([
       "Delete plan and progress",
     ]);
+    localStorage.setItem(
+      "fieldwork-interviews-v1",
+      JSON.stringify([{ planId: plan.id }, { planId: "another-plan" }]),
+    );
+    fireEvent.click(items[0]);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete plan and progress" }),
+    );
+    await waitFor(() =>
+      expect(
+        JSON.parse(localStorage.getItem("fieldwork-interviews-v1")!),
+      ).toEqual([{ planId: "another-plan" }]),
+    );
   });
 });

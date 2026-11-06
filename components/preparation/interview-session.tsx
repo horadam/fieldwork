@@ -10,6 +10,7 @@ import {
   type PracticeSession,
 } from "@/lib/practice-session";
 import type { AiStatus } from "../hooks/use-ai-status";
+import { VoiceAnswer } from "./voice-answer";
 import { CostHint } from "../ui/cost-hint";
 import { usageLabel } from "@/lib/pricing";
 
@@ -22,7 +23,7 @@ export function InterviewSession({
   readOnly,
   ai,
   onComplete,
-  activityDone,
+  completedActivities,
 }: {
   plan: PreparationPlanVersion;
   token: string;
@@ -31,7 +32,7 @@ export function InterviewSession({
   readOnly: boolean;
   ai?: AiStatus | null;
   onComplete: (id: string) => void;
-  activityDone: boolean;
+  completedActivities: Record<string, boolean>;
 }) {
   const request = useMemo(() => apiClient(() => token), [token]);
   const [sessions, setSessions] = useState<PracticeSession[]>([]);
@@ -317,6 +318,14 @@ export function InterviewSession({
                   onChange={(e) => setAnswer(e.target.value)}
                 />
               </label>
+              <VoiceAnswer
+                key={`${session.id}:${session.revision}`}
+                request={request}
+                enabled={ai?.provider === "openai" && !!ai?.ready}
+                disabled={busy || !!pending}
+                onTranscript={setAnswer}
+                prompt={session.prompt}
+              />
               <CostHint ai={ai ?? null} step="practice" sourceChars={60000} />
               <div className="actions">
                 <button
@@ -378,10 +387,14 @@ export function InterviewSession({
                   {session.activityId && session.turns.length > 0 && (
                     <button
                       className="button secondary"
-                      disabled={activityDone || busy || !!pending}
+                      disabled={
+                        !!completedActivities[session.activityId] ||
+                        busy ||
+                        !!pending
+                      }
                       onClick={() => onComplete(session.activityId!)}
                     >
-                      {activityDone
+                      {completedActivities[session.activityId]
                         ? "Rehearsal completed"
                         : "Mark linked rehearsal complete"}
                     </button>

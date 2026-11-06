@@ -473,6 +473,11 @@ export function PreparationWorkspace(props: Props) {
   }
   async function deleteTarget() {
     if (!target) return;
+    const deletedPlanIds = new Set(
+      stateRef.current.plans
+        .filter((p) => p.targetId === target.id)
+        .map((p) => p.id),
+    );
     const done = await work(
       isGroup ? "Deleting group…" : "Deleting plan…",
       async () => {
@@ -490,6 +495,19 @@ export function PreparationWorkspace(props: Props) {
           "delete",
           { id: target.id },
         );
+        if (!token) {
+          const raw = JSON.parse(
+            localStorage.getItem("fieldwork-interviews-v1") || "[]",
+          );
+          if (Array.isArray(raw)) {
+            localStorage.setItem(
+              "fieldwork-interviews-v1",
+              JSON.stringify(
+                raw.filter((session) => !deletedPlanIds.has(session.planId)),
+              ),
+            );
+          }
+        }
         // A role stays selected, ready for a new plan; a deleted group is gone.
         choose(isGroup ? "general" : selected);
       },
@@ -791,9 +809,7 @@ export function PreparationWorkspace(props: Props) {
               activityId={practiceSelection?.activityId || null}
               readOnly={readOnly}
               onComplete={(id) => void toggleActivity(id, true)}
-              activityDone={
-                !!progress?.done[practiceSelection?.activityId || ""]
-              }
+              completedActivities={progress?.done || {}}
             />
           )}
           {props.section === "practice" && practiceMode === "notes" && (
@@ -847,8 +863,8 @@ export function PreparationWorkspace(props: Props) {
             }
             consequence={
               isGroup
-                ? "This deletes the group, all its plan versions, and their progress. Applications and earlier analysis tasks remain."
-                : "This deletes this role's plan versions and their progress. The role stays in the list, ready for a new plan."
+                ? "This deletes the group, all its plan versions, their progress, and interview attempts. Applications and earlier analysis tasks remain."
+                : "This deletes this role's plan versions, their progress, and interview attempts. The role stays in the list, ready for a new plan."
             }
             onConfirm={() => void deleteTarget()}
             onCancel={() => setConfirmDelete(false)}

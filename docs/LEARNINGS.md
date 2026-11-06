@@ -43,3 +43,5 @@ Non-obvious things this project has taught its contributors, human or agent. Rea
 - **`.prettierignore` must keep `.claude/`.** Other sessions' worktrees live there, with vendored PDF.js that `pnpm format` would otherwise rewrite. (2026-11-02)
 - **The TypeScript lib is ES2022,** so `Array.prototype.findLast` isn't available; use `[...items].reverse().find(...)`. (2026-11-02)
 - **Eval scores are heuristics.** Review the raw outputs in `evals/results/` before citing a number, and record notable runs in `evals/results.md`. (2026-11-02)
+
+- **OpenAI's multipart helper probes `fetch('data:,')`.** Audio transport tests should count calls to the provider endpoint, not every fetch, or they mistake the local capability probe for a paid retry. (2026-11-06)

@@ -169,7 +169,7 @@ Estimated cost = (instructions + source characters ÷ 4) × input price + reply 
 ## Optional Supabase storage / hosted use
 
 1. Create a project at [Supabase Dashboard](https://supabase.com/dashboard/new). Use a personal Free organization for this development setup, name the project `job-search-workspace`, choose a nearby region, and generate/save the database password in your password manager. The app does not need that password. Leave the Data API enabled; this app uses the public schema with explicit grants and row-level security.
-2. In the project's SQL Editor, apply **each migration once, in order**: `001_workspace.sql`, `002_resume_import.sql`, `003_resume_without_citations.sql`, **`004_preparation_targets.sql`**, then **`005_inference_usage.sql`** from `supabase/migrations/`. Run one file at a time and stop on an error. For an existing project, apply only migrations not already installed; do not rerun 001 or reset tables.
+2. In the project's SQL Editor, apply **each migration once, in order**: `001_workspace.sql`, `002_resume_import.sql`, `003_resume_without_citations.sql`, **`004_preparation_targets.sql`**, **`005_inference_usage.sql`**, then **`006_practice_sessions.sql`** from `supabase/migrations/`. Run one file at a time and stop on an error. For an existing project, apply only migrations not already installed; do not rerun 001 or reset tables.
 3. Under Authentication, enable email/password sign-up and leave email confirmation enabled. In URL Configuration, set **Site URL** to `http://127.0.0.1:3000` and add `http://127.0.0.1:3000/**` to allowed redirect URLs. If you intentionally use `localhost`, also add `http://localhost:3000/**`; browser records on that origin remain separate. Signup requests explicitly return to the origin where the app was opened. Use exact production URLs when deploying.
 4. Copy the **project URL** and **publishable key** (`sb_publishable_…`) from the project's Connect dialog into `.env.local`, preserving the existing model settings:
 
@@ -226,7 +226,7 @@ The JD comparison performs baseline and grounded runs across 20 cases, 40 model 
 
 ## Deploying
 
-Any Next.js host works with Supabase accounts and `AI_PROVIDER=openai`. A hosted server cannot reach a laptop's Ollama. Hosted AI steps need sign-in or the visitor's own OpenAI key; the local, account-less mode is refused outside loopback development. With no environment variables at all, a hosted copy still runs: browser storage, Simulated preview, and AI steps on visitors' own keys. Set the Supabase URL and publishable key, `OPENAI_API_KEY` and `OPENAI_MODEL` as server environment variables, apply migrations 001–005, and add the deployed URL to Supabase's redirect allowlist. `NEXT_PUBLIC_` values are built into the page, so redeploy after changing them.
+Any Next.js host works with Supabase accounts and `AI_PROVIDER=openai`. A hosted server cannot reach a laptop's Ollama. Hosted AI steps need sign-in or the visitor's own OpenAI key; the local, account-less mode is refused outside loopback development. With no environment variables at all, a hosted copy still runs: browser storage, Simulated preview, and AI steps on visitors' own keys. Set the Supabase URL and publishable key, `OPENAI_API_KEY` and `OPENAI_MODEL` as server environment variables, apply migrations 001–006, and add the deployed URL to Supabase's redirect allowlist. `NEXT_PUBLIC_` values are built into the page, so redeploy after changing them.
 
 ### Public demo: invite-only accounts
 
@@ -252,7 +252,7 @@ Hosted copies explain themselves. An **About this demo** notice (dismissible, re
 - `components/applications-view.tsx`: application list, fit analysis, and each job's preparation plan.
 - `components/preparation-workspace.tsx` and `components/preparation/`: targets, plan generation, review, practice, schedule and tasks.
 - `components/job-import.tsx`, `components/resume-import.tsx`: the import wizards.
-- `supabase/migrations/001–005`: tables, RLS, transactional RPCs and quotas.
+- `supabase/migrations/001–006`: tables, RLS, transactional RPCs and quotas.
 - `evals/`, `scripts/evaluate*.ts`: labelled cases, scorers and the eval harness.
 - `lib/sample-practice.ts`: the sample general-practice content. Replace it with your own.
 
@@ -267,3 +267,5 @@ Preparation navigation follows the selected role: application actions advance fr
 In a job's Interview practice, choose **Practice with interviewer**. Start the selected question or a short mock of up to three questions. **Coach** shows feedback after each answer; **Interview** waits until the end. Each question allows at most two follow-ups. Answers, feedback and repeated attempts are separate from written notes and self-scores. Study activities can open their linked questions directly. Completing a rehearsal remains your decision.
 
 Apply `006_practice_sessions.sql` after migration 005 for account attempt storage and hosted quotas. Browser attempts need no database. Text practice uses the selected Ollama/OpenAI provider, with no fallback. A failed response retains the answer; a failed save offers a save-only retry. See [the session flow and limits](docs/architecture/interview-practice.md). Run `pnpm eval:practice` for synthetic local evaluation; billed comparisons require `--allow-paid`.
+
+**Voice options:** During an interview, expand Voice options. With OpenAI selected, record up to two minutes, listen back, then choose **Transcribe with OpenAI**. This is a separately billed audio request through the server; Ollama is never automatically switched to OpenAI. Correct the transcript before using it as your answer. The app keeps raw audio only in memory. Read question aloud uses an available local English device voice. Recording requires HTTPS or localhost and browser microphone permission. Text remains available if voice is unsupported or denied. Full realtime voice is not implemented.

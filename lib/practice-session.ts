@@ -175,7 +175,7 @@ export function saveLocalSession(
     );
   if (!old && sessions.length >= 100)
     throw new Error(
-      "This browser has 100 practice sessions. Export or clear older practice data before adding more.",
+      "This browser has 100 practice sessions. Delete an unneeded preparation plan to remove its attempts before adding more.",
     );
   return [...sessions.filter((s) => s.id !== next.id), next];
 }

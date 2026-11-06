@@ -31,7 +31,7 @@ it("starts without inference, retains failed answers, and saves an attempt", asy
       readOnly={false}
       ai={{ provider: "ollama", model: "qwen3:8b", ready: true } as never}
       onComplete={() => {}}
-      activityDone={false}
+      completedActivities={{}}
     />,
   );
   await waitFor(() =>
@@ -98,7 +98,7 @@ it("does not show interview feedback until the end", async () => {
       readOnly={false}
       ai={{ ready: true } as never}
       onComplete={() => {}}
-      activityDone={false}
+      completedActivities={{}}
     />,
   );
   fireEvent.change(await screen.findByLabelText("Attempt history"), {
@@ -109,4 +109,77 @@ it("does not show interview feedback until the end", async () => {
     screen.getByRole("button", { name: "End interview and review" }),
   );
   await screen.findByText("Specific hidden feedback");
+});
+
+it("saves a successful reply once and offers explicit rehearsal completion", async () => {
+  const plan = version(await planSources(target, workspace())),
+    complete = vi.fn();
+  const fetcher = vi.fn(
+    async (_url: unknown, init: RequestInit | undefined) => {
+      const { session, answer } = JSON.parse(String(init?.body));
+      const next = advanceSession(
+        plan,
+        session,
+        {
+          id: crypto.randomUUID(),
+          questionId: "q1",
+          prompt: session.prompt,
+          answer,
+          feedback: {
+            strength: "Clear personal scope",
+            improvement: "Explain the alternative",
+            caution: "",
+            answerQuote: answer,
+          },
+          metadata: {
+            provider: "ollama",
+            model: "test",
+            promptVersion: "test",
+            durationMs: 1,
+            inputTokens: 1,
+            outputTokens: 1,
+          },
+        },
+        null,
+      );
+      return Response.json({ session: next });
+    },
+  );
+  vi.stubGlobal("fetch", fetcher);
+  render(
+    <InterviewSession
+      plan={plan}
+      token=""
+      questionIds={["q1"]}
+      activityId="a1"
+      readOnly={false}
+      ai={{ provider: "ollama", ready: true } as never}
+      onComplete={complete}
+      completedActivities={{}}
+    />,
+  );
+  await waitFor(() =>
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Start this question",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Start this question" }));
+  fireEvent.change(await screen.findByLabelText("Your interview answer"), {
+    target: { value: "I built a form" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Send answer" }));
+  await screen.findByText("Clear personal scope");
+  expect(fetcher).toHaveBeenCalledOnce();
+  expect(complete).not.toHaveBeenCalled();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Mark linked rehearsal complete" }),
+  );
+  expect(complete).toHaveBeenCalledWith("a1");
+  const stored = JSON.parse(localStorage.getItem("fieldwork-interviews-v1")!);
+  expect(stored).toHaveLength(1);
+  expect(stored[0].turns).toHaveLength(1);
 });

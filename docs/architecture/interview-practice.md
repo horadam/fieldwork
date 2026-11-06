@@ -39,3 +39,11 @@ Hosted calls on the server key have a 60-turn/hour quota. User-supplied keys ret
 ## Voice direction
 
 The interview state machine is independent of speech input/output. Push-to-talk can transcribe an answer for correction before submission and speak prompts without changing question selection or progress. Full realtime voice is a future alternative: it needs separate interruption, connection, credential and cost controls. See [official voice architecture guidance](https://developers.openai.com/api/docs/guides/voice-agents). No realtime session is implemented here.
+
+## Implemented push-to-talk
+
+[VoiceAnswer](../../components/preparation/voice-answer.tsx) records with MediaRecorder only after the user presses Record answer. It stops at two minutes or 5 MB, stops tracks on unmount, and retains the audio only in memory. The user can listen, discard, or explicitly choose **Transcribe with OpenAI**. The bounded [transcription route](../../app/api/practice/transcribe/route.ts) uses the normal inference access guard and a separate 30/hour hosted quota. It refuses Ollama configuration rather than falling back. The OpenAI transcription model is `gpt-4o-mini-transcribe`; a user's configured text model is not used for audio. One attempt, 45-second deadline, no retries. Audio tokens are recorded as an unpriced call rather than incorrectly applying text-model prices.
+
+The transcript is editable and is not sent to the interviewer until the user chooses **Use transcript as answer**, reviews the answer and presses **Send answer**. The app does not store raw audio. OpenAI receives the recording when transcription is requested. Read-aloud uses only a device voice marked local; without one, text remains available. It does not open a realtime voice session.
+
+Permissions-Policy allows microphone access only for the site's own origin, still requiring browser permission. CSP allows same-origin/blob media playback; its network destinations, script rules and PDF worker permissions are unchanged. Browser microphone recording, real OpenAI transcription and audio quality require manual acceptance on the user's device; no paid audio request was made during implementation. Mocked tests cover provider refusal, input bounds, no retries, permission denial and track cleanup.

@@ -38,6 +38,7 @@ export function contentSecurityPolicy({
     "font-src 'self' data:",
     `connect-src 'self'${supabase}${dev ? " ws:" : ""}`,
     "worker-src 'self' blob:",
+    "media-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -55,7 +56,7 @@ export const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=()",
+    value: "camera=(), microphone=(self), geolocation=(), payment=()",
   },
   {
     key: "Strict-Transport-Security",

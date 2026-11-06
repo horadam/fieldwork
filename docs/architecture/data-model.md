@@ -21,6 +21,13 @@ erDiagram
   ANALYSIS_RUNS ||--o{ PREPARATION_TASKS : "run_id and user_id"
   PREPARATION_TARGETS ||--o{ PREPARATION_PLANS : "target_id and user_id"
   PREPARATION_PLANS ||--o| PREPARATION_PROGRESS : "plan_id and user_id"
+  PREPARATION_PLANS ||--o{ PRACTICE_SESSIONS : "plan_id and user_id"
+  PRACTICE_SESSIONS {
+    uuid id PK
+    uuid user_id FK
+    uuid plan_id FK
+    jsonb payload
+  }
   AUTH_USERS {
     uuid id PK
   }
@@ -153,3 +160,14 @@ validation apply in both modes, but database RLS applies only to database access
   [resume provenance and import IDs](../../lib/resume.ts),
   [plan/progress JSON and validation](../../lib/preparation-plan.ts), and
   [account mutation validation](../../app/api/preparation/route.ts).
+
+## Interview attempts
+
+Migration `006_practice_sessions.sql` stores each attempt in `practice_sessions`.
+Its composite plan/owner foreign key cascades deletion from a plan. Session JSON
+contains question IDs, bounded turns, feedback and execution metadata; those IDs
+are application-level references into the immutable plan payload. Account writes
+use the revision-checked `save_practice_session` RPC. Browser attempts use
+`fieldwork-interviews-v1`; deleting a preparation target removes its attempts.
+Audio recordings remain in browser memory and are never saved in these rows.
+See [interview practice](interview-practice.md).
