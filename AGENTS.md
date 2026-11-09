@@ -49,6 +49,9 @@ Interview-prep workspace: resume import → experience bank → JD fit analysis 
 - Generated content is a draft until the user confirms; writes use stable IDs so retries are idempotent.
 - Reject oversized input; never truncate silently.
 - Record `durationMs` and token usage on every model call.
+- Lines: 1px `--line` hairlines separate or outline (card borders, list rows, sections). Thick lines (2–3px) are colored and mark emphasis (active tab, quoted evidence, accent edges); never use a thick grey line as a divider. Progress is a rounded `.meter` under its label, so it never reads as a rule.
+- Data, not sentences: facts about an item (dates, minutes, type, model) go in a `Meta` row (`components/ui/meta.tsx`), categories in a `.chip`, and anything plural in a real list (`.bullets`, `SourceList` for covered requirements, `.week-items` for schedules). Don't join different pieces of data into one string with " / " or "; ".
+- UI spacing: use the `--space-*` tokens in `app/globals.css`. Space between items comes from the container (the flow rule for cards, notices and disclosures, or `gap` in flex/grid), not from margins on individual buttons or paragraphs.
 
 ## Learnings
 

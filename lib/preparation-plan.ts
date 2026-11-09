@@ -196,7 +196,7 @@ export function sourceProblems(target: PreparationTarget, data: Workspace) {
           {
             jobId: id,
             message:
-              "Source application deleted. Edit target membership before generating.",
+              "Source application deleted. Edit the group's roles, or delete this preparation, before generating.",
           },
         ]
       : !matchingRun(id, data)

@@ -6,13 +6,15 @@
 
 The flowchart shows explicit user actions and where work runs. The state diagram
 describes one version's lifecycle. A target can retain an active version while a
-replacement draft is being reviewed. The shared target selector changes all three
-preparation views without regenerating content.
+replacement draft is being reviewed. The shared selector lists every role (and any
+groups) and changes all three preparation views without regenerating content. A
+role needs no setup: until its first plan is generated it is an unsaved stand-in
+(`resolve()` in the preparation workspace), so there is nothing to delete.
 
 ```mermaid
 flowchart TD
-  SELECT["User: Prepare for this job or create group of 1-3 jobs"]
-  TARGET[("Persist target and timing settings")]
+  SELECT["User: pick a role in Preparing for…, or create a group of 2-3 roles"]
+  TARGET[("Groups are saved at once; a role is saved when its plan is generated")]
   FRESH{"Current real analysis for every job?"}
   ANALYZE["User explicitly runs missing or outdated analyses"]
   BUDGET["User chooses start, horizon/deadline and weekly hours"]
@@ -25,7 +27,7 @@ flowchart TD
   DEFER["Show deferred work and uncovered requirements"]
   ACTIVATE["User: Activate plan"]
   SAVE["Validate again and save version plus active pointer and empty progress"]
-  VIEWS["Interview practice / Study plan / Preparation tasks"]
+  VIEWS["Interview practice / Study plan"]
   PROGRESS[("Shared progress for this version")]
   SELECT --> TARGET --> FRESH
   FRESH -->|"No; generation disabled"| ANALYZE --> FRESH
@@ -54,8 +56,8 @@ stateDiagram-v2
   Active --> Active: Autosave notes and scores, or save completion
   Active --> Previous: A replacement version is activated
   Previous --> Previous: Inspect saved version and progress read-only
-  Active --> [*]: Delete target
-  Previous --> [*]: Delete target
+  Active --> [*]: Delete group or preparation
+  Previous --> [*]: Delete group or preparation
   note right of Draft
     Failed activation retains the draft.
     Existing active versions remain available.

@@ -1,6 +1,7 @@
 "use client";
 import type { Experience } from "@/lib/domain";
 import { EmptyState } from "../ui/empty-state";
+import { Meta } from "../ui/meta";
 
 export function ExperienceView({
   experience,
@@ -35,17 +36,23 @@ export function ExperienceView({
       {experience.map((e) => (
         <article className="card" key={e.id}>
           <h2>{e.title}</h2>
-          <p style={{ whiteSpace: "pre-wrap" }}>{e.body}</p>
+          <ExperienceBody entry={e} />
           {e.provenance && (
             <details>
               <summary>Resume import details</summary>
-              <p className="tiny muted">
-                {e.provenance.organization} · {e.provenance.role} ·{" "}
-                {e.provenance.dates || "Dates not supplied"}
-                <br />
-                {e.provenance.provider} · {e.provenance.model} ·{" "}
-                {e.provenance.promptVersion}
-              </p>
+              <Meta
+                items={[
+                  e.provenance.organization,
+                  e.provenance.role,
+                  e.provenance.dates || "Dates not supplied",
+                ]}
+              />
+              <Meta
+                items={[
+                  `Extracted with ${e.provenance.provider} · ${e.provenance.model}`,
+                  e.provenance.promptVersion,
+                ]}
+              />
               <p className="tiny muted">
                 Details reviewed and confirmed by the user.
               </p>
@@ -73,6 +80,33 @@ export function ExperienceView({
         Use user-confirmed facts. Analysis runs retain the evidence snapshot
         used at generation time.
       </p>
+    </>
+  );
+}
+
+// Imported entries store their dates as the first line and one
+// accomplishment per line; show the dates as metadata and the rest as a list.
+function ExperienceBody({ entry }: { entry: Experience }) {
+  const lines = entry.body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const dates =
+    entry.provenance?.dates && lines[0] === entry.provenance.dates
+      ? lines.shift()
+      : undefined;
+  return (
+    <>
+      {dates && <Meta items={[dates]} />}
+      {lines.length > 1 ? (
+        <ul className="bullets">
+          {lines.map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      ) : (
+        <p style={{ whiteSpace: "pre-wrap" }}>{lines[0] ?? entry.body}</p>
+      )}
     </>
   );
 }

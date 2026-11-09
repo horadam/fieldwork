@@ -1,4 +1,5 @@
 "use client";
+import { Meta, dateRange } from "../ui/meta";
 import { useState } from "react";
 import type { Workspace } from "@/lib/domain";
 import {
@@ -7,7 +8,7 @@ import {
   type PreparationProgress,
   type PreparationTarget,
 } from "@/lib/preparation-plan";
-import { ActivityChecklist } from "./activity-checklist";
+import { ActivityChecklist, activityLabel } from "./activity-checklist";
 
 type Schedule = ReturnType<typeof schedulePlan>;
 type Checklist = {
@@ -24,12 +25,26 @@ const activityTypes = [
   "question_practice",
 ];
 
-// Study plan tab: the plan's activities week by week.
+// Study plan tab: the plan's activities week by week, with filters by job,
+// activity type and status. Filtering keeps the weeks and hides what
+// doesn't match.
 export function PlanSchedule({
   schedule,
   ...checklist
 }: Checklist & { schedule: Schedule }) {
   const { plan, progress } = checklist;
+  const [job, setJob] = useState("");
+  const [type, setType] = useState("");
+  const [status, setStatus] = useState("");
+  const filtering = !!(job || type || status);
+  const matches = (id: string) => {
+    const a = plan.output.activities.find((x) => x.id === id)!;
+    return (
+      (!job || a.refs.some((r) => r.jobId === job)) &&
+      (!type || a.type === type) &&
+      (!status || !!progress.done[id] === (status === "done"))
+    );
+  };
   const completed = plan.output.activities
     .filter(
       (a) =>
@@ -39,73 +54,34 @@ export function PlanSchedule({
     .reduce((n, a) => n + a.minutes, 0);
   return (
     <>
-      <p>
-        {schedule.used} / {schedule.capacity} minutes scheduled · {completed}{" "}
-        estimated minutes completed
-      </p>
-      {schedule.weeks.map((week, i) => (
-        <section className="card" key={week.start}>
-          <h2>
-            Week {i + 1} · {week.start}–{week.end}
-          </h2>
-          <p className="tiny muted">
-            {week.used} / {week.capacity} minutes
-          </p>
-          {week.activityIds.length ? (
-            <ActivityChecklist {...checklist} ids={week.activityIds} />
-          ) : (
-            <p>No activities fit this week.</p>
-          )}
-        </section>
-      ))}
-      <DeferredCoverage
-        {...checklist}
-        schedule={schedule}
-        ids={schedule.deferred}
-      />
-    </>
-  );
-}
-
-// Preparation tasks tab: scheduled activities with filters.
-export function PlanTasks({
-  schedule,
-  ...checklist
-}: Checklist & { schedule: Schedule }) {
-  const { plan, progress } = checklist;
-  const [job, setJob] = useState("");
-  const [type, setType] = useState("");
-  const [status, setStatus] = useState("");
-  const matches = (id: string) => {
-    const a = plan.output.activities.find((x) => x.id === id)!;
-    return (
-      (!job || a.refs.some((r) => r.jobId === job)) &&
-      (!type || a.type === type) &&
-      (!status || !!progress.done[id] === (status === "done"))
-    );
-  };
-  return (
-    <>
       <section className="card">
+        <Meta
+          items={[
+            `${schedule.used} / ${schedule.capacity} minutes scheduled`,
+            `${completed} estimated minutes completed`,
+          ]}
+        />
         <div className="actions">
-          <label>
-            Job{" "}
-            <select value={job} onChange={(e) => setJob(e.target.value)}>
-              <option value="">All jobs</option>
-              {plan.sources.map((s) => (
-                <option key={s.jobId} value={s.jobId}>
-                  {s.company} · {s.role}
-                </option>
-              ))}
-            </select>
-          </label>
+          {plan.sources.length > 1 && (
+            <label>
+              Job{" "}
+              <select value={job} onChange={(e) => setJob(e.target.value)}>
+                <option value="">All jobs</option>
+                {plan.sources.map((s) => (
+                  <option key={s.jobId} value={s.jobId}>
+                    {s.company} · {s.role}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>
             Activity{" "}
             <select value={type} onChange={(e) => setType(e.target.value)}>
               <option value="">All types</option>
               {activityTypes.map((t) => (
                 <option key={t} value={t}>
-                  {t.replaceAll("_", " ")}
+                  {activityLabel(t)}
                 </option>
               ))}
             </select>
@@ -119,18 +95,27 @@ export function PlanTasks({
             </select>
           </label>
         </div>
-        <ActivityChecklist
-          {...checklist}
-          ids={plan.output.activities
-            .map((a) => a.id)
-            .filter(
-              (id) =>
-                !plan.excludedActivityIds.includes(id) &&
-                !schedule.deferred.includes(id) &&
-                matches(id),
-            )}
-        />
       </section>
+      {schedule.weeks.map((week, i) => {
+        const ids = week.activityIds.filter(matches);
+        if (filtering && !ids.length) return null;
+        return (
+          <section className="card" key={week.start}>
+            <h2>Week {i + 1}</h2>
+            <Meta
+              items={[
+                dateRange(week.start, week.end),
+                `${week.used} / ${week.capacity} minutes`,
+              ]}
+            />
+            {ids.length ? (
+              <ActivityChecklist {...checklist} ids={ids} />
+            ) : (
+              <p>No activities fit this week.</p>
+            )}
+          </section>
+        );
+      })}
       <DeferredCoverage
         {...checklist}
         schedule={schedule}

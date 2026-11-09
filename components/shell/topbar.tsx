@@ -1,6 +1,7 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { useUserKeyState, type AiStatus } from "../hooks/use-ai-status";
-import { ModelKey, ModelPrice, SessionTotal } from "./model-key";
+import { KeySummary, ModelPrice, SessionTotal } from "./model-key";
 
 export function Topbar({
   section,
@@ -13,6 +14,7 @@ export function Topbar({
   onSignOut,
   statusOpen,
   onStatusToggle,
+  onSetUpKey,
 }: {
   section: string;
   mode: "demo" | "live";
@@ -26,7 +28,38 @@ export function Topbar({
   // The model panel is controlled so the demo notice can open it.
   statusOpen: boolean;
   onStatusToggle: (open: boolean) => void;
+  // Opens the key dialog; the panel itself only summarises the key.
+  onSetUpKey: () => void;
 }) {
+  const pill = useRef<HTMLDetailsElement>(null);
+  // A glance panel: it closes on an outside click, on Escape (returning
+  // focus to the pill), and once the pill scrolls out of view.
+  useEffect(() => {
+    if (!statusOpen) return;
+    const root = pill.current!;
+    const outside = (event: PointerEvent) => {
+      if (!root.contains(event.target as Node)) onStatusToggle(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      onStatusToggle(false);
+      root.querySelector("summary")?.focus();
+    };
+    const visible =
+      typeof IntersectionObserver === "undefined"
+        ? null
+        : new IntersectionObserver(([entry]) => {
+            if (!entry.isIntersecting) onStatusToggle(false);
+          });
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    visible?.observe(root);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+      visible?.disconnect();
+    };
+  }, [statusOpen, onStatusToggle]);
   const { usage } = useUserKeyState();
   // No model this visitor may use, e.g. a hosted copy without a key.
   const noModel = ai?.allowed === false;
@@ -37,6 +70,7 @@ export function Topbar({
       </p>
       <div className="actions">
         <details
+          ref={pill}
           className="status-pill"
           open={statusOpen}
           onToggle={(e) => onStatusToggle(e.currentTarget.open)}
@@ -86,7 +120,7 @@ export function Topbar({
             >
               Refresh model status
             </button>
-            <ModelKey />
+            <KeySummary onSetUp={onSetUpKey} />
           </div>
         </details>
         {mode === "live" ? (
