@@ -1,30 +1,19 @@
 import { z } from "zod";
+import { callMetadataSchema, feedbackSchema } from "./feedback";
 import {
   validateVersion,
   type PreparationPlanVersion,
 } from "./preparation-plan";
 
 const text = z.string().trim().min(1);
-export const feedbackSchema = z.object({
-  strength: text.max(1000),
-  improvement: text.max(1000),
-  caution: z.string().max(1000),
-  answerQuote: z.string().max(800),
-});
+export { feedbackSchema };
 export const turnSchema = z.object({
   id: z.string().uuid(),
   questionId: text.max(60),
   prompt: text.max(1000),
   answer: text.max(6000),
   feedback: feedbackSchema,
-  metadata: z.object({
-    provider: z.enum(["ollama", "openai"]),
-    model: text.max(100),
-    promptVersion: text.max(100),
-    durationMs: z.number().nonnegative(),
-    inputTokens: z.number().nonnegative(),
-    outputTokens: z.number().nonnegative(),
-  }),
+  metadata: callMetadataSchema,
 });
 export const sessionSchema = z.object({
   id: z.string().uuid(),

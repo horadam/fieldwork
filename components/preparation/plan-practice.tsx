@@ -3,7 +3,13 @@ import type {
   PreparationPlanVersion,
   PreparationProgress,
 } from "@/lib/preparation-plan";
+import { useMemo, useRef, useState } from "react";
+import { apiClient } from "@/lib/api-client";
+import type { AiStatus } from "../hooks/use-ai-status";
+import { CostHint } from "../ui/cost-hint";
+import { Meta } from "../ui/meta";
 import { SourceList } from "./source-list";
+import { CoachFeedback } from "./coach-feedback";
 
 const rubric = ["Clarity", "Correctness", "Depth", "Tradeoffs", "Ownership"];
 
@@ -16,6 +22,8 @@ export function PlanPractice({
   readOnly,
   saveStatus,
   onChange,
+  token,
+  ai,
 }: {
   plan: PreparationPlanVersion;
   progress: PreparationProgress;
@@ -24,11 +32,56 @@ export function PlanPractice({
   readOnly: boolean;
   saveStatus: string;
   onChange: (next: PreparationProgress) => void;
+  token: string;
+  ai?: AiStatus | null;
 }) {
+  const request = useMemo(() => apiClient(() => token), [token]);
+  const [reviewing, setReviewing] = useState<string | null>(null),
+    [reviewError, setReviewError] = useState(""),
+    control = useRef<AbortController | null>(null);
   const question =
     plan.output.questions.find((q) => q.id === questionId) ||
     plan.output.questions[0];
   if (!question) return null;
+  const notes = progress.answers[question.id] || "";
+  const review = progress.reviews?.[question.id];
+  const busy = reviewing === question.id;
+  async function reviewMyNotes() {
+    const id = question!.id;
+    const abort = new AbortController();
+    control.current = abort;
+    setReviewing(id);
+    setReviewError("");
+    try {
+      const result = await request<NonNullable<typeof review>>(
+        "/api/practice/review",
+        {
+          signal: abort.signal,
+          body: {
+            planId: plan.id,
+            questionId: id,
+            notes,
+            ...(!token ? { plan } : {}),
+          },
+        },
+      );
+      if (!abort.signal.aborted)
+        onChange({
+          ...progress,
+          reviews: { ...progress.reviews, [id]: result },
+        });
+    } catch (e) {
+      if (!abort.signal.aborted)
+        setReviewError(
+          e instanceof Error
+            ? e.message
+            : "The review failed. Your notes are unchanged.",
+        );
+    } finally {
+      setReviewing(null);
+      control.current = null;
+    }
+  }
   return (
     <section className="card form practice">
       <label>
@@ -99,8 +152,8 @@ export function PlanPractice({
         {readOnly ? "read-only previous version" : "saved automatically"}
         <textarea
           maxLength={12000}
-          value={progress.answers[question.id] || ""}
-          disabled={readOnly}
+          value={notes}
+          disabled={readOnly || busy}
           onChange={(e) =>
             onChange({
               ...progress,
@@ -143,6 +196,62 @@ export function PlanPractice({
           {saveStatus}
         </p>
       )}
+      <div className="notes-review">
+        <h3>AI review of your notes</h3>
+        {review ? (
+          <div className="feedback">
+            <CoachFeedback
+              feedback={review.feedback}
+              metadata={review.metadata}
+            />
+            <Meta
+              items={[
+                `Reviewed ${new Date(review.reviewedAt).toLocaleString()}`,
+                review.notes.trim() !== notes.trim() &&
+                  "Notes changed since this review",
+              ]}
+            />
+          </div>
+        ) : (
+          <p className="tiny muted">
+            One model call reviews these notes. The feedback is a suggestion and
+            never changes your own scores.
+          </p>
+        )}
+        {reviewError && (
+          <p role="alert" className="notice error">
+            {reviewError}
+          </p>
+        )}
+        {!readOnly && (
+          <>
+            <div className="actions">
+              {busy ? (
+                <button
+                  className="button secondary"
+                  onClick={() => control.current?.abort()}
+                >
+                  Cancel review
+                </button>
+              ) : (
+                <button
+                  className="button secondary"
+                  disabled={!notes.trim() || !ai?.ready || !!reviewing}
+                  onClick={() => void reviewMyNotes()}
+                >
+                  {review ? "Review again" : "Review my notes"}
+                </button>
+              )}
+              {busy && <span role="status">Reviewing…</span>}
+            </div>
+            <CostHint
+              ai={ai ?? null}
+              step="practice"
+              sourceChars={notes.length + 8000}
+            />
+          </>
+        )}
+      </div>
     </section>
   );
 }

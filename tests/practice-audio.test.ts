@@ -1,5 +1,9 @@
 import { afterEach, it, expect, vi } from "vitest";
-import { transcribePractice, AUDIO_MODEL } from "../lib/practice-audio";
+import {
+  transcribePractice,
+  AUDIO_MODEL,
+  MAX_AUDIO_BYTES,
+} from "../lib/practice-audio";
 const input = {
   consent: true,
   mime: "audio/webm",
@@ -29,6 +33,8 @@ it("requires explicit consent, valid format and bounded audio", async () => {
     { ...input, consent: false },
     { ...input, mime: "text/html" },
     { ...input, audio: "x".repeat(7000000) },
+    // Just over the 3 MB limit that keeps uploads under Vercel's body cap.
+    { ...input, audio: Buffer.alloc(MAX_AUDIO_BYTES + 3).toString("base64") },
   ])
     await expect(transcribePractice(value, openai)).rejects.toThrow();
   expect(fetcher).not.toHaveBeenCalled();
@@ -77,4 +83,27 @@ it("sanitizes provider errors and does not retry", async () => {
       String(url).startsWith("https://api.openai.com/"),
     ),
   ).toHaveLength(1);
+});
+it("names the audio model and OpenAI's error code when a recording is rejected", async () => {
+  vi.stubEnv("OPENAI_API_KEY", "synthetic-key");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json(
+        {
+          error: {
+            message: "PRIVATE_AUDIO_AND_KEY",
+            code: "invalid_value",
+            type: "invalid_request_error",
+          },
+        },
+        { status: 400 },
+      ),
+    ),
+  );
+  const error = await transcribePractice(input, openai).catch((e) => e);
+  expect(error).toMatchObject({ code: "openai_request_rejected", status: 400 });
+  expect(error.message).toContain(AUDIO_MODEL);
+  expect(error.message).toContain("400 invalid_value");
+  expect(error.message).not.toContain("PRIVATE_AUDIO_AND_KEY");
 });

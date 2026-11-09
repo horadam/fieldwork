@@ -1,4 +1,5 @@
 "use client";
+import { Tabs, tabPanelProps } from "./ui/tabs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import type { AiStatus } from "./hooks/use-ai-status";
@@ -778,52 +779,52 @@ export function PreparationWorkspace(props: Props) {
             {plan.metadata.model}
           </div>
           {props.section === "practice" && (
-            <div className="actions" role="group" aria-label="Practice method">
-              <button
-                className="button secondary"
-                aria-pressed={practiceMode === "notes"}
-                onClick={() => setPracticeMode("notes")}
-              >
-                Write notes
-              </button>
-              <button
-                className="button secondary"
-                aria-pressed={practiceMode === "interview"}
-                onClick={() => setPracticeMode("interview")}
-              >
-                Practice with interviewer
-              </button>
-            </div>
-          )}
-          {props.section === "practice" && practiceMode === "interview" && (
-            <InterviewSession
-              key={`${props.scope}:${plan.id}`}
-              plan={plan}
-              token={token}
-              ai={props.ai}
-              questionIds={
-                practiceSelection?.ids || [
-                  questionId || plan.output.questions[0].id,
-                ]
-              }
-              activityId={practiceSelection?.activityId || null}
-              readOnly={readOnly}
-              onComplete={(id) => void toggleActivity(id, true)}
-              completedActivities={progress?.done || {}}
-            />
-          )}
-          {props.section === "practice" && practiceMode === "notes" && (
-            <PlanPractice
-              plan={plan}
-              progress={checklist.progress}
-              questionId={questionId}
-              onQuestion={setQuestionId}
-              readOnly={readOnly}
-              saveStatus={saveStatus}
-              onChange={(next) =>
-                setEdits((old) => ({ ...old, [next.planId]: next }))
-              }
-            />
+            <>
+              <Tabs
+                id="practice"
+                label="Practice method"
+                items={[
+                  { id: "notes", label: "Self-assess" },
+                  { id: "interview", label: "Mock interview" },
+                ]}
+                value={practiceMode}
+                onChange={setPracticeMode}
+              />
+              <div {...tabPanelProps("practice", practiceMode)}>
+                {practiceMode === "interview" && (
+                  <InterviewSession
+                    key={`${props.scope}:${plan.id}`}
+                    plan={plan}
+                    token={token}
+                    ai={props.ai}
+                    questionIds={
+                      practiceSelection?.ids || [
+                        questionId || plan.output.questions[0].id,
+                      ]
+                    }
+                    activityId={practiceSelection?.activityId || null}
+                    readOnly={readOnly}
+                    onComplete={(id) => void toggleActivity(id, true)}
+                    completedActivities={progress?.done || {}}
+                  />
+                )}
+                {practiceMode === "notes" && (
+                  <PlanPractice
+                    plan={plan}
+                    progress={checklist.progress}
+                    questionId={questionId}
+                    onQuestion={setQuestionId}
+                    readOnly={readOnly}
+                    saveStatus={saveStatus}
+                    onChange={(next) =>
+                      setEdits((old) => ({ ...old, [next.planId]: next }))
+                    }
+                    token={token}
+                    ai={props.ai}
+                  />
+                )}
+              </div>
+            </>
           )}
           {props.section === "study" && schedule && (
             <PlanSchedule {...checklist} schedule={schedule} />

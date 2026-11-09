@@ -1002,13 +1002,17 @@ footer {
 .apps-detail > p {
   margin: 0;
 }
-.apps-tabs {
+.tabs {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
 }
-.apps-tabs button {
+/* A card under the tabs already draws an edge; a second line would double it. */
+.tabs:has(+ [role="tabpanel"] > .card:first-child) {
+  border-bottom: 0;
+}
+.tabs button {
   white-space: nowrap;
   min-height: 44px;
   padding: 0 14px;
@@ -1017,7 +1021,7 @@ footer {
   background: none;
   color: var(--muted);
 }
-.apps-tabs button.selected {
+.tabs button.selected {
   border-bottom-color: var(--accent);
   color: var(--ink);
   font-weight: 700;
@@ -1401,20 +1405,193 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   margin-top: var(--space-3);
 }
 
-.conversation {
-  list-style: none;
+/* Mock interview: a chat thread with the interviewer, then a composer. */
+.interview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.interview-head h2 {
+  margin: 0;
+}
+.interview-head select {
+  width: auto;
+  max-width: 100%;
+}
+.start-question {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.chat {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
   padding: 0;
+  list-style: none;
 }
-.conversation > li {
-  padding: var(--space-4) 0;
-  border-bottom: 1px solid var(--line);
+.bubble {
+  display: grid;
+  gap: var(--space-1);
+  max-width: min(42rem, 85%);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: 14px;
 }
-.conversation > li > * + * {
+.bubble p {
+  margin: 0;
+}
+.bubble.interviewer {
+  justify-self: start;
+  border-bottom-left-radius: 4px;
+  background: var(--control-fill);
+}
+.bubble.interviewer.current {
+  border-left: 3px solid var(--accent);
+}
+.bubble.interviewer.typing {
+  color: var(--muted);
+}
+.bubble.you {
+  justify-self: end;
+  border-bottom-right-radius: 4px;
+  background: color-mix(in srgb, var(--green) 9%, var(--card));
+}
+.speaker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.chat-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+}
+.chat-icon:hover,
+.chat-icon[aria-pressed="true"] {
+  border-color: var(--control-border);
+  color: var(--ink);
+}
+.notes-review {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.notes-review h3 {
+  margin: 0;
+}
+.notes-review .feedback,
+.chat .feedback {
+  justify-self: stretch;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+/* The card's own border frames the feedback; no extra line above it. */
+.chat .feedback details {
+  padding: 0;
+  border-top: 0;
+}
+.notes-review .feedback > * + *,
+.chat .feedback details > * + * {
   margin-top: var(--space-3);
+}
+.feedback-points {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+.feedback-points dt {
+  font-weight: 700;
+}
+.feedback-points dd {
+  margin: 0;
+}
+.chat-empty {
+  color: var(--muted);
 }
 .answer-text {
   white-space: pre-wrap;
 }
-.interview-session textarea {
-  min-height: 10rem;
+.composer {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--control-border);
+  border-radius: 14px;
+}
+.composer textarea {
+  min-height: 7rem;
+  border: 0;
+  padding: var(--space-1);
+  background: none;
+  resize: vertical;
+}
+.composer textarea:focus {
+  outline: none;
+}
+.composer:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.composer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.composer-send {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+.composer .cost-hint {
+  margin: 0;
+}
+/* The mic button joins the action bar; everything else the voice control
+   shows (recording, notes, errors) takes a full row above it. */
+.voice-answer {
+  display: contents;
+}
+.voice-answer > :not(.button) {
+  flex-basis: 100%;
+  order: -1;
+  margin: 0;
+}
+.voice-answer .button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.voice-answer .button.recording {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.voice-clip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.voice-clip .meta {
+  flex-basis: 100%;
+}
+.voice-clip audio {
+  height: 36px;
+  max-width: 100%;
 }

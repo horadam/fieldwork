@@ -148,18 +148,36 @@ export function agentModel(config: Provider) {
     ? new OpenAIChatCompletionsModel(client, config.model)
     : new OpenAIResponsesModel(client, config.model);
 }
-export function providerError(config: Provider, error: unknown): AIError {
+export function providerError(
+  config: Provider,
+  error: unknown,
+  // Calls that don't use the chat model (transcription) name their own.
+  model = config.model,
+): AIError {
   if (error instanceof AIError) return error;
   const diagnostic =
     error && typeof error === "object"
       ? (error as { name?: string; cause?: { code?: string } })
       : {};
+  // The SDK's errors are all named "Error", so match their classes; plain
+  // objects with a name cover fetch-level failures and tests.
+  const timedOut =
+    error instanceof OpenAI.APIConnectionTimeoutError ||
+    diagnostic.name === "TimeoutError" ||
+    diagnostic.name === "APIConnectionTimeoutError";
+  const unreachable =
+    !timedOut &&
+    (error instanceof OpenAI.APIConnectionError ||
+      diagnostic.name === "APIConnectionError");
+  // Short identifiers only (e.g. ECONNRESET), never a message.
+  const causeCode =
+    typeof diagnostic.cause?.code === "string" &&
+    /^[A-Z0-9_]{1,40}$/.test(diagnostic.cause.code)
+      ? diagnostic.cause.code
+      : undefined;
   if (config.provider === "ollama") {
     const suffix = " No OpenAI request or fallback was made.";
-    if (
-      diagnostic.name === "TimeoutError" ||
-      diagnostic.name === "APIConnectionTimeoutError"
-    ) {
+    if (timedOut) {
       return new AIError(
         `Local inference exceeded ${Math.round(config.deadlineMs / 1000)} seconds. Try a shorter source or retry after the model has loaded.${suffix}`,
         "inference_timeout",
@@ -189,6 +207,13 @@ export function providerError(config: Provider, error: unknown): AIError {
     // OpenAI's own error text is never forwarded: it can quote the key.
     const status = (error as { status?: number } | null)?.status;
     const whose = config.apiKey ? "your" : "the server's";
+    // Short identifiers only (e.g. 400 invalid_value), never the message.
+    const rawCode = (error as { code?: unknown } | null)?.code;
+    const openaiCode =
+      typeof rawCode === "string" && /^[a-z0-9_]{1,64}$/.test(rawCode)
+        ? rawCode
+        : undefined;
+    const reference = `OpenAI ${status ?? ""}${openaiCode ? ` ${openaiCode}` : ""}`;
     if (status === 401)
       return new AIError(
         `OpenAI rejected ${whose} API key. Check the key, then retry. No automatic retry was made.`,
@@ -203,17 +228,56 @@ export function providerError(config: Provider, error: unknown): AIError {
       );
     if (status === 404 || status === 403)
       return new AIError(
-        `${whose === "your" ? "Your" : "The server's"} OpenAI key can't use ${config.model}. Check the model name, then retry. No automatic retry was made.`,
+        `${whose === "your" ? "Your" : "The server's"} OpenAI key can't use ${model}. Check the model name, then retry. No automatic retry was made.`,
         "openai_model_unavailable",
         400,
+      );
+    if (status === 400 || status === 413 || status === 422)
+      return new AIError(
+        `OpenAI rejected the request for ${model} (${reference}). Check the input, then retry. No automatic retry was made.`,
+        "openai_request_rejected",
+        400,
+      );
+    if (status && status >= 500)
+      return new AIError(
+        `OpenAI returned a server error for ${model} (${reference}). Wait a moment, then retry. No automatic retry was made.`,
+        "openai_server_error",
+        502,
+      );
+    if (timedOut)
+      return new AIError(
+        `OpenAI did not answer within ${Math.round(config.deadlineMs / 1000)} seconds. Retry, or try a shorter input. No automatic retry was made.`,
+        "inference_timeout",
+        504,
+      );
+    if (error instanceof OpenAI.APIUserAbortError)
+      return new AIError(
+        "The OpenAI request was cancelled before it finished. No automatic retry was made.",
+        "inference_cancelled",
+        499,
+      );
+    if (unreachable)
+      return new AIError(
+        `The application server lost its connection to OpenAI${causeCode ? ` (${causeCode})` : ""}. Check its network connection, then retry. No automatic retry was made.`,
+        "openai_unreachable",
+        503,
       );
   }
   return new AIError(
     config.provider === "ollama"
       ? `Local inference failed, timed out, or returned invalid output. Open Ollama, ensure ${config.model} is installed, and retry. No OpenAI request or fallback was made.`
-      : "OpenAI inference failed, timed out, or returned invalid output. Check the server model, API key, and account limits before retrying. No automatic retry was made.",
+      : `OpenAI inference failed${errorKind(error)}. Check the server model, API key, and account limits before retrying. No automatic retry was made.`,
     "inference_failed",
   );
+}
+// The error's class, e.g. " (TypeError)", so an unmapped failure can be traced
+// without forwarding its message.
+function errorKind(error: unknown) {
+  const name =
+    error && typeof error === "object" ? error.constructor?.name : undefined;
+  return name && name !== "Object" && /^[A-Za-z]{1,40}$/.test(name)
+    ? ` (${name})`
+    : "";
 }
 export async function providerStatus(config: Provider) {
   // Making a test call would spend the visitor's money, so none is made.

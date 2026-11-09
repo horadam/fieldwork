@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { callMetadataSchema, feedbackSchema } from "./feedback";
 import {
   analysisSchema,
   validateAnalysis,
@@ -146,6 +147,19 @@ export const progressSchema = z.object({
     z.record(z.string(), z.number().int().min(1).max(5)),
   ),
   done: z.record(z.string(), z.boolean()),
+  // AI review of a question's notes, kept with the notes it reviewed so the
+  // UI can say when they have changed since. Optional: older progress has none.
+  reviews: z
+    .record(
+      z.string(),
+      z.object({
+        notes: z.string().max(12000),
+        feedback: feedbackSchema,
+        metadata: callMetadataSchema,
+        reviewedAt: z.string().datetime(),
+      }),
+    )
+    .optional(),
 });
 export type PreparationProgress = z.infer<typeof progressSchema>;
 export type PreparationState = {
@@ -420,6 +434,7 @@ export function validateProgress(raw: unknown, plan: PreparationPlanVersion) {
     p.planId !== plan.id ||
     Object.keys(p.answers).some((id) => !questions.has(id)) ||
     Object.keys(p.scores).some((id) => !questions.has(id)) ||
+    Object.keys(p.reviews || {}).some((id) => !questions.has(id)) ||
     Object.keys(p.done).some((id) => !activities.has(id)) ||
     Object.values(p.scores).some((scores) =>
       Object.keys(scores).some(

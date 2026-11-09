@@ -43,9 +43,24 @@ it("starts without inference, retains failed answers, and saves an attempt", asy
       ).disabled,
     ).toBe(false),
   );
+  // The question to be asked is visible, and can be changed, before starting.
+  const picker = screen.getByLabelText("Question") as HTMLSelectElement;
+  expect(picker.value).toBe("q1");
+  expect(document.querySelector(".start-question")?.textContent).toBe(
+    plan.output.questions[0].text,
+  );
   fireEvent.click(screen.getByRole("button", { name: "Start this question" }));
   const answer = await screen.findByLabelText("Your interview answer");
   expect(fetcher).not.toHaveBeenCalled();
+  const meta = document.querySelector(".interview-session .meta");
+  expect(meta?.textContent).toContain("Coach mode");
+  expect(meta?.textContent).toContain("1 question");
+  // The practice cost belongs to Send answer, after the voice panel.
+  const voice = document.querySelector(".voice-answer")!,
+    cost = document.querySelector(".cost-hint")!;
+  expect(
+    voice.compareDocumentPosition(cost) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
   fireEvent.change(answer, { target: { value: "Built an accessible form" } });
   fireEvent.click(screen.getByRole("button", { name: "Send answer" }));
   await screen.findByRole("alert");
@@ -55,7 +70,7 @@ it("starts without inference, retains failed answers, and saves an attempt", asy
   fireEvent.click(
     screen.getByRole("button", { name: "End interview and review" }),
   );
-  await screen.findByText("Session complete");
+  await screen.findByRole("button", { name: "Try another attempt" });
   expect(
     JSON.parse(localStorage.getItem("fieldwork-interviews-v1")!)[0].status,
   ).toBe("completed");

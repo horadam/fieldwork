@@ -12,6 +12,28 @@ export const practiceReplySchema = z.object({
   followUp: z.string().trim().min(1).max(700).nullable(),
   feedback: feedbackSchema,
 });
+// The job requirements and experience entries a question was built from,
+// resolved from the plan's own snapshots.
+export function questionContext(
+  plan: PreparationPlanVersion,
+  question: PreparationPlanVersion["output"]["questions"][number],
+) {
+  const sources = question.refs.map((ref) => ({
+    ...ref,
+    company: plan.sources.find((s) => s.jobId === ref.jobId)?.company,
+    requirement: plan.sources
+      .find((s) => s.jobId === ref.jobId)
+      ?.analysis.requirements.find((r) => r.id === ref.requirementId)
+      ?.requirement,
+  }));
+  const evidence = question.evidenceRefs.map((ref) => ({
+    ...ref,
+    entry: plan.sources
+      .find((s) => s.jobId === ref.jobId)
+      ?.evidenceSnapshot.find((e) => e.id === ref.evidenceId),
+  }));
+  return { sources, evidence };
+}
 export async function practiceTurn(
   plan: PreparationPlanVersion,
   raw: PracticeSession,
@@ -30,20 +52,7 @@ export async function practiceTurn(
   const question = plan.output.questions.find(
     (q) => q.id === session.questionIds[session.questionIndex],
   )!;
-  const sources = question.refs.map((ref) => ({
-    ...ref,
-    company: plan.sources.find((s) => s.jobId === ref.jobId)?.company,
-    requirement: plan.sources
-      .find((s) => s.jobId === ref.jobId)
-      ?.analysis.requirements.find((r) => r.id === ref.requirementId)
-      ?.requirement,
-  }));
-  const evidence = question.evidenceRefs.map((ref) => ({
-    ...ref,
-    entry: plan.sources
-      .find((s) => s.jobId === ref.jobId)
-      ?.evidenceSnapshot.find((e) => e.id === ref.evidenceId),
-  }));
+  const { sources, evidence } = questionContext(plan, question);
   const history = session.turns
     .filter((t) => t.questionId === question.id)
     .map((t) => ({ question: t.prompt, answer: t.answer }));

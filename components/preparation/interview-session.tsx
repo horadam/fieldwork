@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { PreparationPlanVersion } from "@/lib/preparation-plan";
 import { apiClient } from "@/lib/api-client";
 import {
@@ -11,8 +11,10 @@ import {
 } from "@/lib/practice-session";
 import type { AiStatus } from "../hooks/use-ai-status";
 import { VoiceAnswer } from "./voice-answer";
+import { ReadAloud } from "./read-aloud";
+import { CoachFeedback } from "./coach-feedback";
 import { CostHint } from "../ui/cost-hint";
-import { usageLabel } from "@/lib/pricing";
+import { Meta } from "../ui/meta";
 
 const storageKey = "fieldwork-interviews-v1";
 export function InterviewSession({
@@ -38,6 +40,15 @@ export function InterviewSession({
   const [sessions, setSessions] = useState<PracticeSession[]>([]);
   const [selected, setSelected] = useState("");
   const [mode, setMode] = useState<PracticeSession["mode"]>("coach");
+  // The question a single-question attempt starts with; an activity's
+  // linked questions start together instead.
+  const [startId, setStartId] = useState(questionIds[0]);
+  // Follow the question picked elsewhere (Self-assess, an activity link).
+  useEffect(() => setStartId(questionIds[0]), [questionIds]);
+  const linked = questionIds.length > 1;
+  const startQuestions = (linked ? questionIds.slice(0, 3) : [startId])
+    .map((id) => plan.output.questions.find((q) => q.id === id))
+    .filter((q) => !!q);
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
@@ -167,15 +178,37 @@ export function InterviewSession({
   }
   const showFeedback =
     session?.mode === "coach" || session?.status === "completed";
+  const active = session?.status === "active" && !readOnly;
+  function addTranscript(text: string) {
+    setAnswer((old) => (old.trim() ? `${old.trimEnd()}\n\n${text}` : text));
+  }
   return (
     <section className="card form interview-session">
-      <h2>
-        Practice with an interviewer <span className="chip">Experimental</span>
-      </h2>
-      <p>
-        One question at a time, with up to two follow-ups. Feedback is an AI
-        suggestion, not a verified assessment. Your self-scores stay separate.
-      </p>
+      <div className="interview-head">
+        <h2>
+          Mock interview <span className="chip">Experimental</span>
+        </h2>
+        {sessions.length > 0 && (
+          <select
+            aria-label="Attempt history"
+            disabled={busy || !!pending}
+            value={selected}
+            onChange={(e) => {
+              setSelected(e.target.value);
+              setAnswer("");
+              setError("");
+            }}
+          >
+            <option value="">New attempt</option>
+            {[...sessions].reverse().map((s) => (
+              <option key={s.id} value={s.id}>
+                {new Date(s.createdAt).toLocaleString()} · {s.mode} · {s.status}{" "}
+                · {s.turns.length} answers
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
       {error && (
         <p role="alert" className="notice error">
           {error}
@@ -201,30 +234,41 @@ export function InterviewSession({
           </button>
         </div>
       )}
-      {sessions.length > 0 && (
-        <label>
-          Attempt history
-          <select
-            disabled={busy || !!pending}
-            value={selected}
-            onChange={(e) => {
-              setSelected(e.target.value);
-              setAnswer("");
-              setError("");
-            }}
-          >
-            <option value="">New attempt</option>
-            {[...sessions].reverse().map((s) => (
-              <option key={s.id} value={s.id}>
-                {new Date(s.createdAt).toLocaleString()} · {s.mode} · {s.status}{" "}
-                · {s.turns.length} answers
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
       {!session && !readOnly && (
         <>
+          <p>
+            Answer one question at a time, with up to two follow-ups each.
+            Feedback is an AI suggestion, not a verified assessment, and stays
+            separate from your self-scores.
+          </p>
+          {linked ? (
+            <div>
+              <p className="list-label">Questions in this rehearsal</p>
+              <ol className="bullets">
+                {startQuestions.map((q) => (
+                  <li key={q.id}>{q.text}</li>
+                ))}
+              </ol>
+            </div>
+          ) : (
+            <>
+              <label>
+                Question
+                <select
+                  value={startId}
+                  onChange={(e) => setStartId(e.target.value)}
+                >
+                  {plan.output.questions.map((q, i) => (
+                    <option key={q.id} value={q.id}>
+                      {i + 1}. {q.text}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {/* The picker cuts long questions off; show the full text. */}
+              <p className="start-question">{startQuestions[0]?.text}</p>
+            </>
+          )}
           <label>
             Practice mode
             <select
@@ -241,11 +285,9 @@ export function InterviewSession({
             <button
               className="button"
               disabled={!ready || busy || !ai?.ready}
-              onClick={() => void start(questionIds.slice(0, 3))}
+              onClick={() => void start(startQuestions.map((q) => q.id))}
             >
-              {questionIds.length > 1
-                ? "Start these questions"
-                : "Start this question"}
+              {linked ? "Start these questions" : "Start this question"}
             </button>
             <button
               className="button secondary"
@@ -257,151 +299,165 @@ export function InterviewSession({
               Start short mock · up to 3 questions
             </button>
           </div>
+          <Meta
+            items={[
+              ai?.provider || "No provider configured",
+              ai?.model,
+              "1 call per answer",
+              "up to 9 per mock",
+            ]}
+          />
           <p className="tiny muted">
-            Each submitted answer makes one call to{" "}
-            {ai?.provider || "the configured provider"} ·{" "}
-            {ai?.model || "model unavailable"}. Up to nine calls per mock. No
-            automatic retries. Starting an attempt makes no model call.
+            Starting an attempt makes no model call, and failed calls are never
+            retried automatically.
           </p>
         </>
       )}
       {session && (
         <>
-          <p className="tiny muted">
-            {session.mode === "coach" ? "Coach mode" : "Interview mode"} ·{" "}
-            {session.questionIds.length} question
-            {session.questionIds.length === 1 ? "" : "s"}
-          </p>
-          <ol className="conversation" aria-label="Interview transcript">
+          <Meta
+            items={[
+              session.mode === "coach" ? "Coach mode" : "Interview mode",
+              `${session.questionIds.length} question${session.questionIds.length === 1 ? "" : "s"}`,
+              `${session.turns.length} answered`,
+              !active && (readOnly ? "Read-only" : "Complete"),
+            ]}
+          />
+          <ol className="chat" aria-label="Interview transcript">
             {session.turns.map((t, i) => (
-              <li key={t.id}>
-                <p className="list-label">Interviewer · turn {i + 1}</p>
-                <p>{t.prompt}</p>
-                <p className="list-label">Your answer</p>
-                <p className="answer-text">{t.answer}</p>
+              <Fragment key={t.id}>
+                <li className="bubble interviewer">
+                  <span className="speaker">Interviewer</span>
+                  <p>{t.prompt}</p>
+                </li>
+                <li className="bubble you">
+                  <span className="speaker">You</span>
+                  <p className="answer-text">{t.answer}</p>
+                </li>
                 {showFeedback && (
-                  <details
-                    open={
-                      session.mode === "coach" && i === session.turns.length - 1
-                    }
-                  >
-                    <summary>Coach feedback</summary>
-                    {t.feedback.answerQuote && (
-                      <blockquote>{t.feedback.answerQuote}</blockquote>
-                    )}
-                    <p>
-                      <strong>Strength:</strong> {t.feedback.strength}
-                    </p>
-                    <p>
-                      <strong>Try next:</strong> {t.feedback.improvement}
-                    </p>
-                    {t.feedback.caution && (
-                      <p>
-                        <strong>Check:</strong> {t.feedback.caution}
-                      </p>
-                    )}
-                    <p className="tiny muted">{usageLabel(t.metadata)}</p>
-                  </details>
+                  <li className="feedback">
+                    <details
+                      open={
+                        session.mode === "coach" &&
+                        i === session.turns.length - 1
+                      }
+                    >
+                      <summary>Coach feedback</summary>
+                      <CoachFeedback
+                        feedback={t.feedback}
+                        metadata={t.metadata}
+                      />
+                    </details>
+                  </li>
                 )}
-              </li>
+              </Fragment>
             ))}
+            {active && (
+              <li className="bubble interviewer current">
+                <span className="speaker">
+                  Interviewer <ReadAloud text={session.prompt} />
+                </span>
+                <p>{session.prompt}</p>
+              </li>
+            )}
+            {busy && active && (
+              <li className="bubble interviewer typing" role="status">
+                <span className="speaker">Interviewer</span>
+                <p>Thinking… your answer stays here if the request fails.</p>
+              </li>
+            )}
+            {!active && session.turns.length === 0 && (
+              <li className="chat-empty">No answers were submitted.</li>
+            )}
           </ol>
-          {session.status === "active" && !readOnly ? (
-            <>
-              <h3>{session.prompt}</h3>
-              <label>
-                Your interview answer
-                <textarea
-                  maxLength={6000}
-                  value={answer}
-                  disabled={busy || !!pending}
-                  onChange={(e) => setAnswer(e.target.value)}
-                />
-              </label>
-              <VoiceAnswer
-                key={`${session.id}:${session.revision}`}
-                request={request}
-                enabled={ai?.provider === "openai" && !!ai?.ready}
+          {active ? (
+            <div className="composer">
+              <textarea
+                aria-label="Your interview answer"
+                placeholder="Type your answer, or record it"
+                maxLength={6000}
+                value={answer}
                 disabled={busy || !!pending}
-                onTranscript={setAnswer}
-                prompt={session.prompt}
+                onChange={(e) => setAnswer(e.target.value)}
               />
-              <CostHint ai={ai ?? null} step="practice" sourceChars={60000} />
-              <div className="actions">
-                <button
-                  className="button"
-                  disabled={busy || !!pending || !answer.trim() || !ai?.ready}
-                  onClick={() => void submit()}
-                >
-                  Send answer
-                </button>
-                {busy && control.current && (
-                  <button
-                    className="button secondary"
-                    onClick={() => control.current?.abort()}
-                  >
-                    Cancel response
-                  </button>
-                )}
-                <button
-                  className="button secondary"
+              <div className="composer-bar">
+                <VoiceAnswer
+                  key={`${session.id}:${session.revision}`}
+                  request={request}
+                  enabled={ai?.provider === "openai" && !!ai?.ready}
                   disabled={busy || !!pending}
-                  onClick={async () => {
-                    setBusy(true);
-                    await save({
-                      ...session,
-                      status: "completed",
-                      prompt: "",
-                      revision: session.revision + 1,
-                    });
-                    setBusy(false);
-                  }}
-                >
-                  End interview and review
-                </button>
-              </div>
-              {busy && (
-                <p role="status">
-                  Working… Your answer stays here if the request fails.
-                </p>
-              )}
-            </>
-          ) : (
-            <>
-              <h3>
-                {readOnly ? "Previous plan · read-only" : "Session complete"}
-              </h3>
-              {session.turns.length === 0 && <p>No answers were submitted.</p>}
-              {!readOnly && (
-                <div className="actions">
+                  onTranscript={addTranscript}
+                  userKey={ai?.source === "user"}
+                />
+                <div className="composer-send">
                   <button
-                    className="button"
+                    className="button secondary small"
                     disabled={busy || !!pending}
-                    onClick={() => {
-                      setSelected("");
-                      setAnswer("");
+                    onClick={async () => {
+                      setBusy(true);
+                      await save({
+                        ...session,
+                        status: "completed",
+                        prompt: "",
+                        revision: session.revision + 1,
+                      });
+                      setBusy(false);
                     }}
                   >
-                    Try another attempt
+                    End interview and review
                   </button>
-                  {session.activityId && session.turns.length > 0 && (
+                  {busy && control.current ? (
                     <button
                       className="button secondary"
-                      disabled={
-                        !!completedActivities[session.activityId] ||
-                        busy ||
-                        !!pending
-                      }
-                      onClick={() => onComplete(session.activityId!)}
+                      onClick={() => control.current?.abort()}
                     >
-                      {completedActivities[session.activityId]
-                        ? "Rehearsal completed"
-                        : "Mark linked rehearsal complete"}
+                      Cancel response
+                    </button>
+                  ) : (
+                    <button
+                      className="button"
+                      disabled={
+                        busy || !!pending || !answer.trim() || !ai?.ready
+                      }
+                      onClick={() => void submit()}
+                    >
+                      Send answer
                     </button>
                   )}
                 </div>
-              )}
-            </>
+              </div>
+              <CostHint ai={ai ?? null} step="practice" sourceChars={60000} />
+            </div>
+          ) : (
+            !readOnly && (
+              <div className="actions">
+                <button
+                  className="button"
+                  disabled={busy || !!pending}
+                  onClick={() => {
+                    setSelected("");
+                    setAnswer("");
+                  }}
+                >
+                  Try another attempt
+                </button>
+                {session.activityId && session.turns.length > 0 && (
+                  <button
+                    className="button secondary"
+                    disabled={
+                      !!completedActivities[session.activityId] ||
+                      busy ||
+                      !!pending
+                    }
+                    onClick={() => onComplete(session.activityId!)}
+                  >
+                    {completedActivities[session.activityId]
+                      ? "Rehearsal completed"
+                      : "Mark linked rehearsal complete"}
+                  </button>
+                )}
+              </div>
+            )
           )}
         </>
       )}

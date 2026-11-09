@@ -7,7 +7,9 @@ import {
   type Provider,
 } from "./ai-provider";
 export const AUDIO_MODEL = "gpt-4o-mini-transcribe";
-export const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
+const TRANSCRIBE_DEADLINE_MS = 45000;
+import { MAX_AUDIO_BYTES } from "./practice-audio-limits";
+export { MAX_AUDIO_BYTES };
 const extensions = {
   "audio/webm": "webm",
   "audio/mp4": "mp4",
@@ -41,8 +43,9 @@ export async function transcribePractice(
     bytes.length > MAX_AUDIO_BYTES ||
     bytes.toString("base64") !== input.audio
   )
-    throw new AIError("Use a valid recording up to 5 MB.", "voice_input", 400);
-  const started = Date.now();
+    throw new AIError("Use a valid recording up to 3 MB.", "voice_input", 400);
+  const started = Date.now(),
+    deadline = AbortSignal.timeout(TRANSCRIBE_DEADLINE_MS);
   let inputTokens = 0,
     outputTokens = 0;
   try {
@@ -55,9 +58,7 @@ export async function transcribePractice(
         response_format: "json",
       },
       {
-        signal: signal
-          ? AbortSignal.any([signal, AbortSignal.timeout(45000)])
-          : AbortSignal.timeout(45000),
+        signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
         maxRetries: 0,
       },
     );
@@ -86,7 +87,20 @@ export async function transcribePractice(
       },
     };
   } catch (e) {
-    const error = providerError(config, e);
+    // Our own deadline reaches the SDK as an abort, so name it here.
+    const error = deadline.aborted
+      ? new AIError(
+          `OpenAI did not finish transcribing within ${TRANSCRIBE_DEADLINE_MS / 1000} seconds. Your recording is retained; retry, or record a shorter answer. No automatic retry was made.`,
+          "inference_timeout",
+          504,
+        )
+      : signal?.aborted
+        ? new AIError(
+            "Transcription was cancelled. Your recording is retained.",
+            "inference_cancelled",
+            499,
+          )
+        : providerError(config, e, AUDIO_MODEL);
     error.usage = {
       provider: "openai",
       model: AUDIO_MODEL,

@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useState } from "react";
+import { Tabs, tabPanelProps } from "./ui/tabs";
 import {
   fitCoverage,
   type Analysis,
@@ -95,11 +96,6 @@ export function ApplicationsView({
   const [search, setSearch] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
   const [section, setSection] = useState<Section>("fit");
-  const tabRefs = useRef<Record<Section, HTMLButtonElement | null>>({
-    jd: null,
-    fit: null,
-    plan: null,
-  });
 
   // A newly started or explicitly opened run should be visible immediately.
   useEffect(() => {
@@ -141,16 +137,6 @@ export function ApplicationsView({
   function selectJob(id: string) {
     setJobId(id);
     onSelectRun(null);
-  }
-  function tabKey(event: KeyboardEvent<HTMLDivElement>) {
-    const step =
-      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (!step) return;
-    event.preventDefault();
-    const index = sections.findIndex((s) => s.id === section);
-    const next = sections[(index + step + sections.length) % sections.length];
-    setSection(next.id);
-    tabRefs.current[next.id]?.focus();
   }
 
   const analyzeButton = job && (
@@ -294,37 +280,15 @@ export function ApplicationsView({
             />
           )}
 
-          <div
-            className="apps-tabs"
-            role="tablist"
-            aria-label="Application sections"
-            onKeyDown={tabKey}
-          >
-            {sections.map((s) => (
-              <button
-                key={s.id}
-                ref={(el) => {
-                  tabRefs.current[s.id] = el;
-                }}
-                id={`apps-tab-${s.id}`}
-                role="tab"
-                aria-selected={section === s.id}
-                aria-controls="apps-panel"
-                tabIndex={section === s.id ? 0 : -1}
-                className={section === s.id ? "selected" : undefined}
-                onClick={() => setSection(s.id)}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+          <Tabs
+            id="apps"
+            label="Application sections"
+            items={sections}
+            value={section}
+            onChange={setSection}
+          />
 
-          <div
-            id="apps-panel"
-            role="tabpanel"
-            aria-labelledby={`apps-tab-${section}`}
-            className="apps-panel"
-          >
+          <div {...tabPanelProps("apps", section)} className="apps-panel">
             {section === "jd" && <p className="jd-text">{job.jd}</p>}
 
             {section === "fit" && !run && (

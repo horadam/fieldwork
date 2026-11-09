@@ -100,7 +100,7 @@ flowchart TB
   SOURCE["Embedded sources: analysis IDs, JD/experience snapshots, fingerprints"]
   RUN["Original analysis row and its captured source data"]
   OUTPUT["Embedded output: questions, outlines, activities, requirement refs"]
-  PROGRESS["Progress payload: answers, scores and done maps"]
+  PROGRESS["Progress payload: answers, scores, done and optional notes reviews"]
   TARGET -.->|"jobIds; no SQL membership FK"| JOBS
   TARGET -.->|"activeVersionId; no SQL pointer FK"| PLAN
   PLAN -->|"Contains JSON"| SOURCE
