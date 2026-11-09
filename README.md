@@ -31,7 +31,7 @@ ollama pull qwen3:8b         # optional: real analysis needs a local model
 pnpm dev                     # http://127.0.0.1:3000
 ```
 
-The workspace opens with synthetic sample data in browser storage, and **Simulated preview** shows the full flow without any model. The sections below cover model setup, every flow, and optional Supabase accounts.
+The workspace opens with synthetic sample data in browser storage, and, until a model is ready, **Simulated preview** in an application's ⋯ menu shows the full flow without any model. The sections below cover model setup, every flow, and optional Supabase accounts.
 
 ## Local setup
 

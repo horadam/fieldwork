@@ -7,7 +7,7 @@ import { useMemo, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import type { AiStatus } from "../hooks/use-ai-status";
 import { CostHint } from "../ui/cost-hint";
-import { Meta } from "../ui/meta";
+import { Meta, dateTime } from "../ui/meta";
 import { SourceList } from "./source-list";
 import { CoachFeedback } from "./coach-feedback";
 
@@ -22,6 +22,7 @@ export function PlanPractice({
   readOnly,
   saveStatus,
   onChange,
+  onReview,
   token,
   ai,
 }: {
@@ -32,6 +33,12 @@ export function PlanPractice({
   readOnly: boolean;
   saveStatus: string;
   onChange: (next: PreparationProgress) => void;
+  // Saves a review into the latest progress, not the one captured when the
+  // review started, so edits made meanwhile survive.
+  onReview: (
+    questionId: string,
+    review: NonNullable<PreparationProgress["reviews"]>[string],
+  ) => void;
   token: string;
   ai?: AiStatus | null;
 }) {
@@ -65,11 +72,7 @@ export function PlanPractice({
           },
         },
       );
-      if (!abort.signal.aborted)
-        onChange({
-          ...progress,
-          reviews: { ...progress.reviews, [id]: result },
-        });
+      if (!abort.signal.aborted) onReview(id, result);
     } catch (e) {
       if (!abort.signal.aborted)
         setReviewError(
@@ -148,8 +151,7 @@ export function PlanPractice({
         })}
       </details>
       <label>
-        Your answer notes ·{" "}
-        {readOnly ? "read-only previous version" : "saved automatically"}
+        Your answer notes
         <textarea
           maxLength={12000}
           value={notes}
@@ -193,7 +195,7 @@ export function PlanPractice({
       </div>
       {!readOnly && (
         <p className="tiny muted" role="status">
-          {saveStatus}
+          {saveStatus || "Notes and scores save automatically."}
         </p>
       )}
       <div className="notes-review">
@@ -206,7 +208,7 @@ export function PlanPractice({
             />
             <Meta
               items={[
-                `Reviewed ${new Date(review.reviewedAt).toLocaleString()}`,
+                `Reviewed ${dateTime(review.reviewedAt)}`,
                 review.notes.trim() !== notes.trim() &&
                   "Notes changed since this review",
               ]}
@@ -226,22 +228,20 @@ export function PlanPractice({
         {!readOnly && (
           <>
             <div className="actions">
-              {busy ? (
-                <button
-                  className="button secondary"
-                  onClick={() => control.current?.abort()}
-                >
-                  Cancel review
-                </button>
-              ) : (
-                <button
-                  className="button secondary"
-                  disabled={!notes.trim() || !ai?.ready || !!reviewing}
-                  onClick={() => void reviewMyNotes()}
-                >
-                  {review ? "Review again" : "Review my notes"}
-                </button>
-              )}
+              {/* One button that changes role, so keyboard focus stays on it. */}
+              <button
+                className="button secondary"
+                disabled={!busy && (!notes.trim() || !ai?.ready || !!reviewing)}
+                onClick={() =>
+                  busy ? control.current?.abort() : void reviewMyNotes()
+                }
+              >
+                {busy
+                  ? "Cancel review"
+                  : review
+                    ? "Review again"
+                    : "Review my notes"}
+              </button>
               {busy && <span role="status">Reviewing…</span>}
             </div>
             <CostHint

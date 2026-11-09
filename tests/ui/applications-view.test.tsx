@@ -117,9 +117,7 @@ describe("ApplicationsView", () => {
     });
     fireEvent.click(screen.getByRole("tab", { name: "Prep plan" }));
     expect(screen.getByText("Example SaaS · Engineer")).toBeTruthy();
-    expect(document.body.textContent).toContain(
-      "5 questions · 3 of 8 scheduled activities left",
-    );
+    expect(document.body.textContent).toContain("3 of 8 activities left");
     expect(screen.queryByText("Other job")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Open preparation" }));
     expect(handlers.onOpenTarget).toHaveBeenCalledWith("t1");
@@ -138,7 +136,7 @@ describe("ApplicationsView", () => {
   });
 
   it("runs actions from the ⋯ menu, including a simulated preview", () => {
-    const handlers = setup();
+    const handlers = setup({ aiReady: false });
     fireEvent.click(
       screen.getByLabelText("More actions", { selector: "summary" }),
     );
@@ -150,6 +148,16 @@ describe("ApplicationsView", () => {
       screen.getByRole("menuitem", { name: "Delete application" }),
     );
     expect(handlers.onDelete).toHaveBeenCalledWith(job);
+  });
+
+  it("hides the simulated preview when a model is ready", () => {
+    setup();
+    fireEvent.click(
+      screen.getByLabelText("More actions", { selector: "summary" }),
+    );
+    expect(
+      screen.queryByRole("menuitem", { name: /Simulated preview/ }),
+    ).toBeNull();
   });
 
   it("hides the simulated preview for signed-in accounts", () => {

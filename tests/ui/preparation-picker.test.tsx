@@ -107,7 +107,7 @@ describe("Preparing for…", () => {
       "Edit group",
       "Delete group",
     ]);
-    expect(document.body.textContent).toContain("Roles:");
+    expect(screen.getByLabelText("Roles in this group")).toBeTruthy();
   });
 
   it("groups the dropdown into roles and groups", async () => {

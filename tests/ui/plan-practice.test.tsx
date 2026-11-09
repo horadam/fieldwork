@@ -39,7 +39,8 @@ it("reviews notes on request and keeps the result beside self-scores", async () 
   };
   const fetcher = vi.fn(async () => Response.json(review));
   vi.stubGlobal("fetch", fetcher);
-  const onChange = vi.fn();
+  const onChange = vi.fn(),
+    onReview = vi.fn();
   const props = {
     plan,
     questionId: "q1",
@@ -47,6 +48,7 @@ it("reviews notes on request and keeps the result beside self-scores", async () 
     readOnly: false,
     saveStatus: "",
     onChange,
+    onReview,
     token: "",
     ai,
   };
@@ -63,11 +65,16 @@ it("reviews notes on request and keeps the result beside self-scores", async () 
   view.rerender(<PlanPractice {...props} progress={progress} />);
   expect(fetcher).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Review my notes" }));
-  await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
+  await waitFor(() => expect(onReview).toHaveBeenCalledOnce());
   expect(fetcher).toHaveBeenCalledOnce();
-  const saved = onChange.mock.calls[0][0];
-  expect(saved.reviews.q1.feedback.strength).toBe("Names what shipped");
-  expect(saved.scores).toEqual({});
+  // Only the review is handed back, never a whole progress object captured
+  // when the review started, so edits made meanwhile can't be overwritten.
+  expect(onChange).not.toHaveBeenCalled();
+  expect(onReview.mock.calls[0][0]).toBe("q1");
+  expect(onReview.mock.calls[0][1].feedback.strength).toBe(
+    "Names what shipped",
+  );
+  const saved = { ...progress, reviews: { q1: onReview.mock.calls[0][1] } };
   view.rerender(
     <PlanPractice
       {...props}

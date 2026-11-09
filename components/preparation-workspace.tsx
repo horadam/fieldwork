@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import type { AiStatus } from "./hooks/use-ai-status";
 import { CostHint } from "./ui/cost-hint";
+import { Meta } from "./ui/meta";
 import type { TabId } from "./shell/tabs";
 import { Dialog } from "./modals/dialog";
 import { ConfirmDeleteBody } from "./modals/confirm-delete";
@@ -606,17 +607,18 @@ export function PreparationWorkspace(props: Props) {
               </button>
             </div>
             {target && isGroup && (
-              <p className="tiny muted">
-                Roles:{" "}
-                {target.jobIds
-                  .map((id) => {
-                    const job = workspace.jobs.find((j) => j.id === id);
-                    return job
-                      ? `${job.company} · ${job.role}`
-                      : "Deleted application";
-                  })
-                  .join(" / ")}
-              </p>
+              <div className="chip-row" aria-label="Roles in this group">
+                {target.jobIds.map((id) => {
+                  const job = workspace.jobs.find((j) => j.id === id);
+                  return (
+                    <span className="chip" key={id}>
+                      {job
+                        ? `${job.company} · ${job.role}`
+                        : "Deleted application"}
+                    </span>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
@@ -773,11 +775,14 @@ export function PreparationWorkspace(props: Props) {
       {target && plan && checklist && (
         <>
           <h2>Preparation for {target.name}</h2>
-          <div className="notice">
-            {readOnly ? "Previous version · read-only" : "Active plan"} ·{" "}
-            {plan.settings.startDate} · {plan.metadata.provider} /{" "}
-            {plan.metadata.model}
-          </div>
+          <Meta
+            items={[
+              readOnly ? "Previous version · read-only" : "Active plan",
+              `Starts ${plan.settings.startDate}`,
+              plan.metadata.provider,
+              plan.metadata.model,
+            ]}
+          />
           {props.section === "practice" && (
             <>
               <Tabs
@@ -818,6 +823,20 @@ export function PreparationWorkspace(props: Props) {
                     saveStatus={saveStatus}
                     onChange={(next) =>
                       setEdits((old) => ({ ...old, [next.planId]: next }))
+                    }
+                    // Merged into the latest progress, so edits made while
+                    // the review ran are kept.
+                    onReview={(questionId, review) =>
+                      setEdits((old) => {
+                        const base = old[plan.id] || checklist.progress;
+                        return {
+                          ...old,
+                          [plan.id]: {
+                            ...base,
+                            reviews: { ...base.reviews, [questionId]: review },
+                          },
+                        };
+                      })
                     }
                     token={token}
                     ai={props.ai}

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Tabs, tabPanelProps } from "./ui/tabs";
+import { Meta, dateTime } from "./ui/meta";
 import {
   fitCoverage,
   type Analysis,
@@ -38,7 +39,7 @@ function fitLabel(run: Run | undefined) {
 }
 
 function runMeta(run: Run) {
-  const when = new Date(run.created_at).toLocaleString();
+  const when = dateTime(run.created_at);
   if (isSimulated(run)) return `Simulated preview · no model called · ${when}`;
   const duration =
     run.status === "running" || run.status === "pending"
@@ -239,7 +240,8 @@ export function ApplicationsView({
                     onSelect: () => onPrepare(job),
                     disabled: busy,
                   },
-                  ...(mode === "demo"
+                  // Only for browser-mode visitors without a usable model.
+                  ...(mode === "demo" && !aiReady
                     ? [
                         {
                           label: "Simulated preview (no model)",
@@ -315,7 +317,7 @@ export function ApplicationsView({
                       >
                         {runs.map((r) => (
                           <option key={r.id} value={r.id}>
-                            {new Date(r.created_at).toLocaleString()} ·{" "}
+                            {dateTime(r.created_at)} ·{" "}
                             {isSimulated(r) ? "simulated" : r.status}
                           </option>
                         ))}
@@ -391,11 +393,20 @@ function PrepPlan({
         <div className="list-row" key={s.targetId}>
           <div className="grow">
             <strong>{s.name}</strong>
-            <p className="tiny muted">
-              {s.plan
-                ? `Active plan from ${new Date(s.plan.createdAt).toLocaleDateString()} · ${s.plan.questions} questions · ${s.plan.remaining} of ${s.plan.scheduled} scheduled activities left`
-                : "No active plan yet. Generate and review one in Interview practice."}
-            </p>
+            {s.plan ? (
+              <Meta
+                items={[
+                  `Active plan from ${new Date(s.plan.createdAt).toLocaleDateString()}`,
+                  `${s.plan.questions} questions`,
+                  `${s.plan.remaining} of ${s.plan.scheduled} activities left`,
+                ]}
+              />
+            ) : (
+              <p className="tiny muted">
+                No active plan yet. Generate and review one in Interview
+                practice.
+              </p>
+            )}
           </div>
           <button
             className="button secondary small"

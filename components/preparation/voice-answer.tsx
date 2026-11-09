@@ -69,6 +69,7 @@ export function VoiceAnswer({
     };
   }, []);
   async function record() {
+    if (busy) return;
     if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
     setError("");
     setAdded(false);
@@ -113,8 +114,8 @@ export function VoiceAnswer({
         if (timer.current) clearInterval(timer.current);
         setRecording(false);
         if (tooLarge) return;
-        // Pressing Record, with the note shown while recording, is the
-        // consent to send this one recording; a failure is never retried.
+        // Pressing Record, with the terms shown beside it, is the consent to
+        // send this one recording; a failure is never retried.
         const recorded = new Blob(chunks, { type: mime });
         setBlob(recorded);
         void transcribe(recorded);
@@ -186,76 +187,82 @@ export function VoiceAnswer({
       ? "Voice answers need OpenAI. Choose it in model settings, or keep typing."
       : "";
   const length = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-  const cost = `≈ ${formatCost((Math.max(seconds, 1) / 60) * AUDIO_PRICE_PER_MINUTE)}`;
+  const kept = !!blob && !transcribing;
+  // One button for every step, so keyboard focus never falls off a removed one.
+  const step = recording
+    ? { label: "Stop and transcribe", run: stop, primary: true }
+    : transcribing
+      ? {
+          label: "Cancel transcription",
+          run: () => abort.current?.abort(),
+          primary: false,
+        }
+      : kept
+        ? {
+            label: `Retry transcription · ≈ ${formatCost((Math.max(seconds, 1) / 60) * AUDIO_PRICE_PER_MINUTE)}`,
+            run: () => void transcribe(),
+            primary: true,
+          }
+        : { label: "Record answer", run: () => void record(), primary: false };
+  // Not disabled while the microphone opens: a disabled button drops focus.
+  const blocked =
+    !recording &&
+    !transcribing &&
+    (!!unavailable || disabled || (kept && busy));
   return (
     <div className="voice-answer">
-      {recording ? (
-        <button type="button" className="button small recording" onClick={stop}>
-          <MicIcon /> Stop and transcribe · {length}
+      <button
+        type="button"
+        className={`button small${step.primary ? "" : " secondary"}${recording ? " recording" : ""}`}
+        disabled={blocked}
+        aria-describedby={unavailable ? "voice-unavailable" : "voice-terms"}
+        onClick={step.run}
+      >
+        <MicIcon /> {step.label}
+      </button>
+      {kept && (
+        <button
+          type="button"
+          className="button secondary small"
+          disabled={busy}
+          onClick={() => {
+            setBlob(null);
+            setError("");
+          }}
+        >
+          Discard recording
         </button>
-      ) : (
-        !blob && (
-          <button
-            type="button"
-            className="button secondary small"
-            disabled={!!unavailable || disabled || busy}
-            aria-describedby={unavailable ? "voice-unavailable" : undefined}
-            onClick={() => void record()}
-          >
-            <MicIcon /> Record answer
-          </button>
-        )
       )}
-      {unavailable && !recording && (
+      {(recording || transcribing || kept) && (
+        // The timer lives outside the button, so its label stays stable.
+        <span
+          className="tiny muted voice-status"
+          role={transcribing ? "status" : undefined}
+        >
+          {recording
+            ? `Recording · ${length}`
+            : transcribing
+              ? `Transcribing ${length} of audio…`
+              : `Recording kept · ${length}`}
+        </span>
+      )}
+      {unavailable ? (
         <span id="voice-unavailable" className="tiny muted">
           {unavailable}
         </span>
-      )}
-      {recording && (
-        <Meta
-          items={[
-            "When you stop, the audio is transcribed by OpenAI and never saved",
-            AUDIO_MODEL_LABEL,
-            userKey ? "your OpenAI key" : "the server's key",
-            `≈ ${formatCost(AUDIO_PRICE_PER_MINUTE)} per minute`,
-            "stops at 2:00",
-          ]}
-        />
-      )}
-      {transcribing && (
-        <div className="voice-clip" role="status">
-          <span>Transcribing {length} of audio…</span>
-          <button
-            type="button"
-            className="button secondary small"
-            onClick={() => abort.current?.abort()}
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-      {blob && !transcribing && (
-        <div className="voice-clip">
-          <span>Recording kept · {length}</span>
-          <button
-            type="button"
-            className="button small"
-            disabled={busy || disabled || !enabled}
-            onClick={() => void transcribe()}
-          >
-            Retry transcription · {cost}
-          </button>
-          <button
-            type="button"
-            className="button secondary small"
-            disabled={busy}
-            onClick={() => {
-              setBlob(null);
-              setError("");
-            }}
-          >
-            Discard
-          </button>
+      ) : (
+        // Shown before recording: pressing Record is consent to send it.
+        <div id="voice-terms" className="voice-terms">
+          <Meta
+            items={[
+              "Voice: sent to OpenAI when you stop",
+              AUDIO_MODEL_LABEL,
+              userKey ? "your OpenAI key" : "the server's key",
+              `≈ ${formatCost(AUDIO_PRICE_PER_MINUTE)} per minute`,
+              "up to 2:00",
+              "never saved",
+            ]}
+          />
         </div>
       )}
       {added && (

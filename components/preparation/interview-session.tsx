@@ -14,7 +14,7 @@ import { VoiceAnswer } from "./voice-answer";
 import { ReadAloud } from "./read-aloud";
 import { CoachFeedback } from "./coach-feedback";
 import { CostHint } from "../ui/cost-hint";
-import { Meta } from "../ui/meta";
+import { Meta, dateTime } from "../ui/meta";
 
 const storageKey = "fieldwork-interviews-v1";
 export function InterviewSession({
@@ -54,6 +54,10 @@ export function InterviewSession({
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState<PracticeSession | null>(null);
+  // Start, Send and a finished transcript put focus in the answer box, so
+  // keyboard users don't land back at the top of the page.
+  const composer = useRef<HTMLTextAreaElement | null>(null),
+    focusComposer = useRef(false);
   const control = useRef<AbortController | null>(null);
   const session = pending || sessions.find((s) => s.id === selected);
   useEffect(() => {
@@ -109,6 +113,7 @@ export function InterviewSession({
       setSelected(next.id);
       setPending(null);
       setAnswer("");
+      focusComposer.current = next.status === "active";
     } catch (e) {
       setError(
         e instanceof Error
@@ -181,7 +186,38 @@ export function InterviewSession({
   const active = session?.status === "active" && !readOnly;
   function addTranscript(text: string) {
     setAnswer((old) => (old.trim() ? `${old.trimEnd()}\n\n${text}` : text));
+    composer.current?.focus();
   }
+  useEffect(() => {
+    if (focusComposer.current && active && !busy) {
+      focusComposer.current = false;
+      composer.current?.focus();
+    }
+  });
+  async function end() {
+    if (!session) return;
+    // Ending is final for this attempt, so never drop an unsent draft silently.
+    if (
+      answer.trim() &&
+      !window.confirm(
+        "Your unsent answer will be discarded. End the interview anyway?",
+      )
+    )
+      return;
+    setBusy(true);
+    await save({
+      ...session,
+      status: "completed",
+      prompt: "",
+      revision: session.revision + 1,
+    });
+    setBusy(false);
+  }
+  const errorNotice = error && (
+    <p role="alert" className="notice error">
+      {error}
+    </p>
+  );
   return (
     <section className="card form interview-session">
       <div className="interview-head">
@@ -202,18 +238,16 @@ export function InterviewSession({
             <option value="">New attempt</option>
             {[...sessions].reverse().map((s) => (
               <option key={s.id} value={s.id}>
-                {new Date(s.createdAt).toLocaleString()} · {s.mode} · {s.status}{" "}
-                · {s.turns.length} answers
+                {dateTime(s.createdAt)} ·{" "}
+                {s.status === "active" ? "In progress" : "Complete"} ·{" "}
+                {s.turns.length} {s.turns.length === 1 ? "answer" : "answers"}
               </option>
             ))}
           </select>
         )}
       </div>
-      {error && (
-        <p role="alert" className="notice error">
-          {error}
-        </p>
-      )}
+      {/* While answering, errors show in the reply box instead. */}
+      {!active && errorNotice}
       {pending && (
         <div className="notice">
           <p>
@@ -265,8 +299,6 @@ export function InterviewSession({
                   ))}
                 </select>
               </label>
-              {/* The picker cuts long questions off; show the full text. */}
-              <p className="start-question">{startQuestions[0]?.text}</p>
             </>
           )}
           <label>
@@ -296,7 +328,7 @@ export function InterviewSession({
                 void start(plan.output.questions.slice(0, 3).map((q) => q.id))
               }
             >
-              Start short mock · up to 3 questions
+              Start a short mock (up to 3 questions)
             </button>
           </div>
           <Meta
@@ -353,7 +385,8 @@ export function InterviewSession({
               </Fragment>
             ))}
             {active && (
-              <li className="bubble interviewer current">
+              // Announced politely when a follow-up or next question arrives.
+              <li className="bubble interviewer current" aria-live="polite">
                 <span className="speaker">
                   Interviewer <ReadAloud text={session.prompt} />
                 </span>
@@ -373,8 +406,9 @@ export function InterviewSession({
           {active ? (
             <div className="composer">
               <textarea
+                ref={composer}
                 aria-label="Your interview answer"
-                placeholder="Type your answer, or record it"
+                placeholder="Type your answer, or record it…"
                 maxLength={6000}
                 value={answer}
                 disabled={busy || !!pending}
@@ -393,39 +427,32 @@ export function InterviewSession({
                   <button
                     className="button secondary small"
                     disabled={busy || !!pending}
-                    onClick={async () => {
-                      setBusy(true);
-                      await save({
-                        ...session,
-                        status: "completed",
-                        prompt: "",
-                        revision: session.revision + 1,
-                      });
-                      setBusy(false);
-                    }}
+                    onClick={() => void end()}
                   >
                     End interview and review
                   </button>
-                  {busy && control.current ? (
-                    <button
-                      className="button secondary"
-                      onClick={() => control.current?.abort()}
-                    >
-                      Cancel response
-                    </button>
-                  ) : (
-                    <button
-                      className="button"
-                      disabled={
-                        busy || !!pending || !answer.trim() || !ai?.ready
-                      }
-                      onClick={() => void submit()}
-                    >
-                      Send answer
-                    </button>
-                  )}
+                  {/* One button that becomes Cancel, so focus stays on it. */}
+                  <button
+                    className={
+                      busy && control.current ? "button secondary" : "button"
+                    }
+                    disabled={
+                      !(busy && control.current) &&
+                      (busy || !!pending || !answer.trim() || !ai?.ready)
+                    }
+                    onClick={() =>
+                      busy && control.current
+                        ? control.current.abort()
+                        : void submit()
+                    }
+                  >
+                    {busy && control.current
+                      ? "Cancel response"
+                      : "Send answer"}
+                  </button>
                 </div>
               </div>
+              {errorNotice}
               <CostHint ai={ai ?? null} step="practice" sourceChars={60000} />
             </div>
           ) : (

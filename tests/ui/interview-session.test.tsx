@@ -46,11 +46,10 @@ it("starts without inference, retains failed answers, and saves an attempt", asy
   // The question to be asked is visible, and can be changed, before starting.
   const picker = screen.getByLabelText("Question") as HTMLSelectElement;
   expect(picker.value).toBe("q1");
-  expect(document.querySelector(".start-question")?.textContent).toBe(
-    plan.output.questions[0].text,
-  );
   fireEvent.click(screen.getByRole("button", { name: "Start this question" }));
   const answer = await screen.findByLabelText("Your interview answer");
+  // Starting moves keyboard focus into the answer box.
+  await waitFor(() => expect(document.activeElement).toBe(answer));
   expect(fetcher).not.toHaveBeenCalled();
   const meta = document.querySelector(".interview-session .meta");
   expect(meta?.textContent).toContain("Coach mode");
@@ -67,6 +66,17 @@ it("starts without inference, retains failed answers, and saves an attempt", asy
   expect((answer as HTMLTextAreaElement).value).toBe(
     "Built an accessible form",
   );
+  // An unsent draft is never dropped without asking.
+  const confirm = vi.fn(() => false);
+  vi.stubGlobal("confirm", confirm);
+  fireEvent.click(
+    screen.getByRole("button", { name: "End interview and review" }),
+  );
+  expect(confirm).toHaveBeenCalledOnce();
+  expect((answer as HTMLTextAreaElement).value).toBe(
+    "Built an accessible form",
+  );
+  confirm.mockReturnValue(true);
   fireEvent.click(
     screen.getByRole("button", { name: "End interview and review" }),
   );

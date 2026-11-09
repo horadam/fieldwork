@@ -24,6 +24,12 @@ export function ReadAloud({ text }: { text: string }) {
       speechSynthesis.removeEventListener("voiceschanged", load);
     };
   }, []);
+  // A new question replaces the old one; stop reading the old one.
+  useEffect(() => {
+    if (typeof speechSynthesis === "undefined") return;
+    speechSynthesis.cancel();
+    setSpeaking(false);
+  }, [text]);
   if (!voice) return null;
   function toggle() {
     speechSynthesis.cancel();
@@ -43,7 +49,8 @@ export function ReadAloud({ text }: { text: string }) {
     <button
       type="button"
       className="chat-icon"
-      aria-label={speaking ? "Stop reading" : "Read question aloud"}
+      // A fixed name with aria-pressed: "Read question aloud, pressed".
+      aria-label="Read question aloud"
       title={speaking ? "Stop reading" : "Read aloud with this device's voice"}
       aria-pressed={speaking}
       onClick={toggle}

@@ -151,8 +151,10 @@ it("toggles one read-aloud button and hides it without a local voice", () => {
   const view = render(<ReadAloud text="Question" />);
   fireEvent.click(screen.getByRole("button", { name: "Read question aloud" }));
   expect(synth.speak).toHaveBeenCalledOnce();
-  fireEvent.click(screen.getByRole("button", { name: "Stop reading" }));
-  screen.getByRole("button", { name: "Read question aloud" });
+  const button = screen.getByRole("button", { name: "Read question aloud" });
+  expect(button.getAttribute("aria-pressed")).toBe("true");
+  fireEvent.click(button);
+  expect(button.getAttribute("aria-pressed")).toBe("false");
   view.unmount();
   synth.voices = [];
   render(<ReadAloud text="Question" />);
@@ -193,12 +195,16 @@ it("transcribes once when recording stops and adds it to the draft", async () =>
       onTranscript={onTranscript}
     />,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Record answer" }));
-  await screen.findByText(/transcribed by OpenAI and never saved/);
+  // What will be sent, and its cost, is shown before recording starts.
+  screen.getByText("Voice: sent to OpenAI when you stop");
+  const mic = screen.getByRole("button", { name: "Record answer" });
+  mic.focus();
+  fireEvent.click(mic);
+  // The same button becomes Stop, so keyboard focus stays on it.
+  await screen.findByRole("button", { name: /Stop and transcribe/ });
+  expect(document.activeElement).toBe(mic);
   expect(request).not.toHaveBeenCalled();
-  fireEvent.click(
-    await screen.findByRole("button", { name: /Stop and transcribe/ }),
-  );
+  fireEvent.click(mic);
   await waitFor(() =>
     expect(onTranscript).toHaveBeenCalledWith("I led the rollout."),
   );
