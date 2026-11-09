@@ -61,14 +61,42 @@ export function SessionTotal({ usage }: { usage: SessionUsage }) {
 type Models = { priced: string[]; unpriced: string[] };
 const keyPattern = /^sk-[A-Za-z0-9_-]{20,300}$/;
 
+// The key's state in the status panel, with a way to set it up or change it.
+// Setting up happens in KeyForm, opened in a dialog.
+export function KeySummary({ onSetUp }: { onSetUp: () => void }) {
+  const { userKey, remember } = useUserKeyState();
+  return userKey ? (
+    <div className="tiny model-key">
+      <p>
+        <strong>Your OpenAI key</strong> (…{userKey.key.slice(-4)}) is in use
+        with {userKey.model}. It&apos;s kept{" "}
+        {remember ? "on this device" : "until this tab closes"}.
+      </p>
+      <div className="actions">
+        <button className="button secondary small" onClick={onSetUp}>
+          Change
+        </button>
+        <button className="button secondary small" onClick={forgetUserKey}>
+          Forget key
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div className="model-key">
+      <button className="button secondary small" onClick={onSetUp}>
+        Use your own OpenAI key
+      </button>
+    </div>
+  );
+}
+
 /**
  * Lets a visitor run AI steps on their own OpenAI key, kept in this browser.
  * The key is checked first by listing its models (free), and the visitor then
  * picks from the models that key can use and whose price the app knows.
  */
-export function ModelKey() {
+export function KeyForm({ onDone }: { onDone: () => void }) {
   const { userKey, remember } = useUserKeyState();
-  const [editing, setEditing] = useState(false);
   const [problem, setProblem] = useState("");
   const [checking, setChecking] = useState(false);
   // The key that was checked and the models it can use.
@@ -79,12 +107,6 @@ export function ModelKey() {
   const [choice, setChoice] = useState("");
   const request = useMemo(() => apiClient(() => ""), []);
   const id = useId();
-
-  function close() {
-    setProblem("");
-    setChecked(null);
-    setEditing(false);
-  }
 
   async function check(key: string) {
     if (!keyPattern.test(key))
@@ -120,42 +142,11 @@ export function ModelKey() {
       { key: checked.key, model: choice },
       fields.get("remember") === "on",
     );
-    close();
+    onDone();
   }
 
-  if (!editing)
-    return userKey ? (
-      <div className="tiny model-key">
-        <p>
-          <strong>Your OpenAI key</strong> (…{userKey.key.slice(-4)}) is in use
-          with {userKey.model}. It&apos;s kept{" "}
-          {remember ? "on this device" : "until this tab closes"}.
-        </p>
-        <div className="actions">
-          <button
-            className="button secondary small"
-            onClick={() => setEditing(true)}
-          >
-            Change
-          </button>
-          <button className="button secondary small" onClick={forgetUserKey}>
-            Forget key
-          </button>
-        </div>
-      </div>
-    ) : (
-      <div className="model-key">
-        <button
-          className="button secondary small"
-          onClick={() => setEditing(true)}
-        >
-          Use your own OpenAI key
-        </button>
-      </div>
-    );
-
   return (
-    <form className="form model-key" onSubmit={submit}>
+    <form className="form" onSubmit={submit}>
       <p className="tiny">
         Your key is sent to this app&apos;s server with each AI request and
         passed straight to OpenAI. The server doesn&apos;t store or log it. You
@@ -242,7 +233,7 @@ export function ModelKey() {
         <button
           className="button secondary small"
           type="button"
-          onClick={close}
+          onClick={onDone}
         >
           Cancel
         </button>

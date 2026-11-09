@@ -132,7 +132,7 @@ describe("target editor", () => {
     expect(existing.settings.hoursPerWeek).toBe(12);
   });
 
-  it("requires one to three applications", () => {
+  it("requires two or three roles for a group", () => {
     const onSave = vi.fn();
     render(
       <TargetEditor
@@ -142,12 +142,18 @@ describe("target editor", () => {
         onCancel={() => {}}
       />,
     );
-    fireEvent.change(screen.getByLabelText("Target name"), {
+    expect(
+      screen.getByRole("heading", { name: "Create a group" }),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Group name"), {
       target: { value: "Group" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save target" }));
+    fireEvent.click(
+      screen.getByLabelText(`${seed.jobs[0].company} · ${seed.jobs[0].role}`),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save group" }));
     expect(onSave).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toContain("one to three");
+    expect(screen.getByRole("alert").textContent).toContain("two or three");
   });
 });
 

@@ -2,7 +2,8 @@
 import type { Task } from "@/lib/domain";
 import { EmptyState } from "../ui/empty-state";
 
-// Preparation tasks with no target selected. Plan activities live with their
+// Earlier analysis tasks, shown under Study plan with no target selected.
+// Plan activities live with their
 // target; this lists tasks approved from fit analyses before preparation
 // plans replaced approval. Checkbox changes save immediately.
 export function EarlierTasksView({
