@@ -1,6 +1,7 @@
 "use client";
 import type { Workspace } from "@/lib/domain";
-import type { PlanSummary } from "@/lib/preparation-plan";
+import { matchingRun, type PlanSummary } from "@/lib/preparation-plan";
+import { Meta } from "../ui/meta";
 import { overviewSteps } from "@/lib/sample-practice";
 import type { TabId } from "../shell/tabs";
 
@@ -21,6 +22,8 @@ export function OverviewView({
   studyTotal: number;
   onNavigate: (tab: TabId) => void;
 }) {
+  const analyzed = data.jobs.filter((j) => matchingRun(j.id, data)).length;
+  const activePlans = planSummaries.filter((s) => s.plan).length;
   return (
     <>
       <section className="card hero">
@@ -32,6 +35,14 @@ export function OverviewView({
               ? "Start by adding the experience you want to bring into your interviews."
               : "Choose an application, check your fit, and build a plan around your available time.")}
         </p>
+        {/* Where the whole workspace stands, not only the open preparation. */}
+        <Meta
+          items={[
+            `${data.experience.length} experience ${data.experience.length === 1 ? "record" : "records"}`,
+            `${analyzed} of ${data.jobs.length} ${data.jobs.length === 1 ? "application" : "applications"} with a current analysis`,
+            `${activePlans} active ${activePlans === 1 ? "plan" : "plans"}`,
+          ]}
+        />
         <button
           className="button accent"
           onClick={() =>
@@ -60,10 +71,9 @@ export function OverviewView({
         </div>
         <div className="stat">
           <strong>
-            {planSummaries.reduce((n, s) => n + (s.plan?.remaining ?? 0), 0) +
-              data.tasks.filter((t) => !t.done).length}
+            {planSummaries.reduce((n, s) => n + (s.plan?.remaining ?? 0), 0)}
           </strong>
-          <span>Preparation tasks to do</span>
+          <span>Plan activities left</span>
         </div>
       </div>
       <details>
@@ -84,7 +94,7 @@ export function OverviewView({
                   aria-label={`Open ${s.title}`}
                   onClick={() => onNavigate(s.target)}
                 >
-                  ↗
+                  →
                 </button>
               </div>
             ))}

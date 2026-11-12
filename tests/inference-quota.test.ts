@@ -15,10 +15,27 @@ beforeAll(async () => {
   await db.exec(
     `create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon; insert into auth.users values('${alice}'),('${bob}');`,
   );
+  // 007 also replaces start_analysis, whose return type 001 creates.
+  for (const file of ["001_workspace.sql", "002_resume_import.sql"])
+    await db.exec(
+      await readFile(
+        new URL(`../supabase/migrations/${file}`, import.meta.url),
+        "utf8",
+      ),
+    );
   await db.exec(
     await readFile(
       new URL(
         "../supabase/migrations/005_inference_usage.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await db.exec(
+    await readFile(
+      new URL(
+        "../supabase/migrations/007_quota_retry_minutes.sql",
         import.meta.url,
       ),
       "utf8",
@@ -32,8 +49,9 @@ describe.sequential("hosted inference quota (PGlite)", () => {
   it("allows ten resume extractions an hour, then refuses", async () => {
     await asUser(alice);
     for (let i = 0; i < 10; i++) await reserve("resume_extraction");
+    // The oldest call was just made, so its slot opens in an hour.
     await expect(reserve("resume_extraction")).rejects.toThrow(
-      "Hourly inference limit reached",
+      "Hourly inference limit reached; retry in 60 minutes",
     );
   });
   it("counts each kind and each user separately", async () => {

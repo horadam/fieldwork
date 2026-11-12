@@ -4,7 +4,9 @@ import type { PreparationPlanVersion } from "@/lib/preparation-plan";
 import { apiClient } from "@/lib/api-client";
 import {
   newSession,
+  readLocalSessions,
   saveLocalSession,
+  writeLocalSessions,
   sessionSchema,
   validateSession,
   type PracticeSession,
@@ -16,10 +18,10 @@ import { CoachFeedback } from "./coach-feedback";
 import { CostHint } from "../ui/cost-hint";
 import { Meta, dateTime } from "../ui/meta";
 
-const storageKey = "fieldwork-interviews-v1";
 export function InterviewSession({
   plan,
   token,
+  scope,
   questionIds,
   activityId,
   readOnly,
@@ -29,6 +31,8 @@ export function InterviewSession({
 }: {
   plan: PreparationPlanVersion;
   token: string;
+  // Owner of browser-mode attempts; matches the preparation workspace scope.
+  scope: string;
   questionIds: string[];
   activityId: string | null;
   readOnly: boolean;
@@ -69,7 +73,7 @@ export function InterviewSession({
               `/api/practice/sessions?planId=${plan.id}`,
               { signal: abort.signal },
             )
-          : JSON.parse(localStorage.getItem(storageKey) || "[]");
+          : readLocalSessions(scope);
         if (!Array.isArray(raw))
           throw new Error("Invalid saved practice data.");
         const all = raw
@@ -101,13 +105,8 @@ export function InterviewSession({
           body: { planId: plan.id, session: next },
         });
       else {
-        const all = JSON.parse(localStorage.getItem(storageKey) || "[]").map(
-          (s: unknown) => sessionSchema.parse(s),
-        );
-        localStorage.setItem(
-          storageKey,
-          JSON.stringify(saveLocalSession(all, next)),
-        );
+        const all = readLocalSessions(scope).map((s) => sessionSchema.parse(s));
+        writeLocalSessions(scope, saveLocalSession(all, next));
       }
       setSessions((old) => [...old.filter((s) => s.id !== next.id), next]);
       setSelected(next.id);

@@ -168,6 +168,8 @@ Its composite plan/owner foreign key cascades deletion from a plan. Session JSON
 contains question IDs, bounded turns, feedback and execution metadata; those IDs
 are application-level references into the immutable plan payload. Account writes
 use the revision-checked `save_practice_session` RPC. Browser attempts use
-`fieldwork-interviews-v1`; deleting a preparation target removes its attempts.
+`fieldwork-interviews-v1-<scope>` (the same owner scope as the preparation
+workspace); attempts under the older unscoped key move to the `browser` scope
+once, on first read. Deleting a preparation target removes its attempts.
 Audio recordings remain in browser memory and are never saved in these rows.
 See [interview practice](interview-practice.md).

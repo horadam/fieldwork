@@ -82,6 +82,9 @@ reply limit into a pre-run ceiling. The same constants set the steps'
 Fit analysis keeps its own limit of ten per hour in `start_analysis`. A
 reservation counts even when the call later fails, as analysis reservations do.
 Local development calls without an account are not metered.
+[Migration 007](../../supabase/migrations/007_quota_retry_minutes.sql) makes both
+refusals say how many minutes remain until the oldest call in the window leaves it;
+the 429 message passes that on ("Try again in 12 minutes.").
 
 ## Implementation
 

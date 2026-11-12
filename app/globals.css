@@ -86,6 +86,12 @@ h3,
 p {
   margin-top: 0;
 }
+/* A long unbroken name wraps instead of widening the page. */
+h1,
+h2,
+h3 {
+  overflow-wrap: anywhere;
+}
 h1 {
   font-size: clamp(32px, 4vw, 48px);
   font-family: Georgia, serif;
@@ -289,7 +295,8 @@ h3 {
   overflow: hidden;
 }
 .hero .eyebrow,
-.hero .sub {
+.hero .sub,
+.hero .meta {
   color: #c0cbbd;
 }
 .hero h2 {
@@ -681,9 +688,11 @@ footer {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
+  /* Wrap rather than scroll: five destinations fit in two rows, and none
+     hides off-screen where a first-time visitor would miss it. */
   .sidebar nav {
     display: flex;
-    overflow: auto;
+    flex-wrap: wrap;
     padding-block: var(--space-1);
     gap: 5px;
     margin-top: 16px;
@@ -931,7 +940,9 @@ footer {
 }
 .apps-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
+  min-width: 0;
 }
 .apps-list .search {
   margin-bottom: 6px;
@@ -956,9 +967,8 @@ footer {
 }
 .apps-row-role {
   font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .apps-row-meta {
   display: flex;
@@ -972,17 +982,18 @@ footer {
   padding: 1px 6px;
 }
 .apps-row-company {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .apps-row-fit {
   margin-left: auto;
+  flex-shrink: 0;
   font-weight: 700;
   color: var(--green);
 }
 .apps-detail {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   margin-bottom: 0;
   padding: 28px;
@@ -993,6 +1004,9 @@ footer {
   gap: 16px;
   justify-content: space-between;
   align-items: flex-start;
+}
+.apps-detail-top > div {
+  min-width: 0;
 }
 .apps-detail-top h2 {
   margin: 4px 0 0;
@@ -1183,7 +1197,7 @@ footer {
 }
 @media (max-width: 1000px) {
   .apps {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1317,6 +1331,12 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   font-size: 11px;
   line-height: 1.6;
   white-space: nowrap;
+}
+/* A status that says nothing has happened yet. */
+.chip.quiet {
+  background: transparent;
+  color: var(--muted);
+  font-weight: 400;
 }
 .chip-row {
   display: flex;

@@ -202,25 +202,52 @@ export function matchingRun(jobId: string, data: Workspace): Run | undefined {
           canonicalEvidence(data.experience),
     );
 }
-export function sourceProblems(target: PreparationTarget, data: Workspace) {
-  return target.jobIds.flatMap((id) => {
+// Why a job has no current real analysis, in one sentence the Applications
+// and Study screens share; null when matchingRun finds one.
+export function analysisProblem(jobId: string, data: Workspace): string | null {
+  const job = data.jobs.find((j) => j.id === jobId);
+  if (!job || matchingRun(jobId, data)) return null;
+  const latest = [...data.runs]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .find(
+      (r) =>
+        r.application_id === jobId &&
+        r.status === "completed" &&
+        r.output &&
+        r.model !== "none" &&
+        r.provider !== "simulated",
+    );
+  if (latest && latest.jd_snapshot && latest.jd_snapshot !== job.jd)
+    return "The job description changed since this analysis. Re-run a real analysis before building a plan.";
+  if (latest?.evidence_snapshot)
+    return "Your experience changed since this analysis. Re-run a real analysis before building a plan.";
+  return "Run a current real analysis first.";
+}
+export type SourceProblem = {
+  jobId: string;
+  // "Role at Company", shown when a group needs to say which role.
+  label: string | null;
+  message: string;
+};
+export function sourceProblems(
+  target: PreparationTarget,
+  data: Workspace,
+): SourceProblem[] {
+  return target.jobIds.flatMap((id): SourceProblem[] => {
     const job = data.jobs.find((j) => j.id === id);
-    return !job
-      ? [
-          {
-            jobId: id,
-            message:
-              "Source application deleted. Edit the group's roles, or delete this preparation, before generating.",
-          },
-        ]
-      : !matchingRun(id, data)
-        ? [
-            {
-              jobId: id,
-              message: `${job.company} · ${job.role}: run a current real analysis first.`,
-            },
-          ]
-        : [];
+    if (!job)
+      return [
+        {
+          jobId: id,
+          label: null,
+          message:
+            "Source application deleted. Edit the group's roles, or delete this preparation, before generating.",
+        },
+      ];
+    const message = analysisProblem(id, data);
+    return message
+      ? [{ jobId: id, label: `${job.role} at ${job.company}`, message }]
+      : [];
   });
 }
 async function fingerprint(value: string) {
@@ -241,7 +268,11 @@ export async function planSources(
   targetSchema.parse(target);
   const problems = sourceProblems(target, data);
   if (problems.length)
-    throw new SourceError(problems.map((p) => p.message).join(" "));
+    throw new SourceError(
+      problems
+        .map((p) => (p.label ? `${p.label}: ${p.message}` : p.message))
+        .join(" "),
+    );
   return Promise.all(
     target.jobIds.map(async (id) => {
       const job = data.jobs.find((j) => j.id === id)!,

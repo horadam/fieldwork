@@ -26,6 +26,7 @@ it("starts without inference, retains failed answers, and saves an attempt", asy
     <InterviewSession
       plan={plan}
       token=""
+      scope="browser"
       questionIds={["q1"]}
       activityId="a1"
       readOnly={false}
@@ -82,7 +83,8 @@ it("starts without inference, retains failed answers, and saves an attempt", asy
   );
   await screen.findByRole("button", { name: "Try another attempt" });
   expect(
-    JSON.parse(localStorage.getItem("fieldwork-interviews-v1")!)[0].status,
+    JSON.parse(localStorage.getItem("fieldwork-interviews-v1-browser")!)[0]
+      .status,
   ).toBe("completed");
 });
 it("does not show interview feedback until the end", async () => {
@@ -118,6 +120,7 @@ it("does not show interview feedback until the end", async () => {
     <InterviewSession
       plan={plan}
       token=""
+      scope="browser"
       questionIds={["q1"]}
       activityId={null}
       readOnly={false}
@@ -175,6 +178,7 @@ it("saves a successful reply once and offers explicit rehearsal completion", asy
     <InterviewSession
       plan={plan}
       token=""
+      scope="browser"
       questionIds={["q1"]}
       activityId="a1"
       readOnly={false}
@@ -204,7 +208,9 @@ it("saves a successful reply once and offers explicit rehearsal completion", asy
     screen.getByRole("button", { name: "Mark linked rehearsal complete" }),
   );
   expect(complete).toHaveBeenCalledWith("a1");
-  const stored = JSON.parse(localStorage.getItem("fieldwork-interviews-v1")!);
+  const stored = JSON.parse(
+    localStorage.getItem("fieldwork-interviews-v1-browser")!,
+  );
   expect(stored).toHaveLength(1);
   expect(stored[0].turns).toHaveLength(1);
 });
