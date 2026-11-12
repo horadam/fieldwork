@@ -32,7 +32,7 @@ export function TimingFields({
           />
         </label>
         <label>
-          Preparation horizon
+          How long do you have?
           <select
             value={value.duration}
             disabled={disabled}
@@ -81,7 +81,7 @@ export function TimingFields({
       </label>
       <p className="tiny muted">
         {budget
-          ? `${budget.capacity} minutes available across ${budget.weeks.length} week(s). Partial weeks are prorated.`
+          ? `${Number((budget.capacity / 60).toFixed(1))} hours available over ${budget.weeks.length === 1 ? "one week" : `${budget.weeks.length} weeks`}.`
           : "Choose valid dates and 0.5–40 hours/week."}
       </p>
     </div>

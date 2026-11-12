@@ -31,7 +31,7 @@ ollama pull qwen3:8b         # optional: real analysis needs a local model
 pnpm dev                     # http://127.0.0.1:3000
 ```
 
-The workspace opens with synthetic sample data in browser storage, and **Simulated preview** shows the full flow without any model. The sections below cover model setup, every flow, and optional Supabase accounts.
+The workspace opens with synthetic sample data in browser storage, and, until a model is ready, **Simulated preview** in an application's ⋯ menu shows the full flow without any model. The sections below cover model setup, every flow, and optional Supabase accounts.
 
 ## Local setup
 
@@ -105,7 +105,7 @@ Open Interview practice and pick any role in **Preparing for…**, or choose **A
 2. Choose start date, **one week**, **two weeks**, or an interview date, and 0.5–40 hours/week. Defaults are today, one week and 12 hours/week. The interview day is included; partial weeks are prorated. Specific dates may be up to one year from the start.
 3. Choose **Generate preparation plan**. One structured provider call combines requirements, analysis questions/tasks and referenced experience into questions with suggested answer outlines and prioritized study/practice activities. No browsing, grading, tools, tracing, automatic retry, download or provider fallback occurs. The serialized model input is limited to 60,000 characters without silent truncation; narrow an oversized target or shorten experience and re-analyze.
 4. Review questions/outlines, edit activities and estimates (5–120 minutes), change priority, deselect activities, and adjust timing. The schedule recalculates locally without another inference call. Activities are allocated in priority order, preserving input order for ties; indivisible activities that cannot fit any weekly bucket go to **Deferred**. Uncovered requirements are visible.
-5. Choose **Activate plan**. Interview practice uses its questions and source evidence; written answers and self-review scores save automatically shortly after you stop typing. Study plan shows the activities week by week, with job, type and status filters; ticking one marks it done. Writing an answer does not complete a rehearsal. Deferred work is kept outside schedule totals. Tasks approved from analyses before preparation plans replaced that step remain usable under Study plan, separate from the schedule.
+5. Choose **Start using this plan**. Interview practice uses its questions and source evidence; written answers and self-review scores save automatically shortly after you stop typing. Study plan shows the activities week by week, with job, type and status filters; ticking one marks it done. Writing an answer does not complete a rehearsal. Deferred work is kept outside schedule totals. Tasks approved from analyses before preparation plans replaced that step remain usable under Study plan, separate from the schedule.
 
 Changing sources, target membership or timing never rewrites an active plan. Generate, review and activate a new version explicitly. Old versions retain their notes/scores/completion and are read-only; progress is not transferred automatically. Failed saves retain the review; activation retries do not duplicate versions or reset progress. Closing/reloading discards unactivated drafts and answer edits typed in the last moment before autosave. A target deletion removes its versions/progress, while deleting an application retains preparation snapshots and marks affected membership as needing repair.
 
@@ -169,7 +169,7 @@ Estimated cost = (instructions + source characters ÷ 4) × input price + reply 
 ## Optional Supabase storage / hosted use
 
 1. Create a project at [Supabase Dashboard](https://supabase.com/dashboard/new). Use a personal Free organization for this development setup, name the project `job-search-workspace`, choose a nearby region, and generate/save the database password in your password manager. The app does not need that password. Leave the Data API enabled; this app uses the public schema with explicit grants and row-level security.
-2. In the project's SQL Editor, apply **each migration once, in order**: `001_workspace.sql`, `002_resume_import.sql`, `003_resume_without_citations.sql`, **`004_preparation_targets.sql`**, then **`005_inference_usage.sql`** from `supabase/migrations/`. Run one file at a time and stop on an error. For an existing project, apply only migrations not already installed; do not rerun 001 or reset tables.
+2. In the project's SQL Editor, apply **each migration once, in order**: `001_workspace.sql`, `002_resume_import.sql`, `003_resume_without_citations.sql`, **`004_preparation_targets.sql`**, **`005_inference_usage.sql`**, **`006_practice_sessions.sql`**, then **`007_quota_retry_minutes.sql`** from `supabase/migrations/`. Run one file at a time and stop on an error. For an existing project, apply only migrations not already installed; do not rerun 001 or reset tables.
 3. Under Authentication, enable email/password sign-up and leave email confirmation enabled. In URL Configuration, set **Site URL** to `http://127.0.0.1:3000` and add `http://127.0.0.1:3000/**` to allowed redirect URLs. If you intentionally use `localhost`, also add `http://localhost:3000/**`; browser records on that origin remain separate. Signup requests explicitly return to the origin where the app was opened. Use exact production URLs when deploying.
 4. Copy the **project URL** and **publishable key** (`sb_publishable_…`) from the project's Connect dialog into `.env.local`, preserving the existing model settings:
 
@@ -226,7 +226,7 @@ The JD comparison performs baseline and grounded runs across 20 cases, 40 model 
 
 ## Deploying
 
-Any Next.js host works with Supabase accounts and `AI_PROVIDER=openai`. A hosted server cannot reach a laptop's Ollama. Hosted AI steps need sign-in or the visitor's own OpenAI key; the local, account-less mode is refused outside loopback development. With no environment variables at all, a hosted copy still runs: browser storage, Simulated preview, and AI steps on visitors' own keys. Set the Supabase URL and publishable key, `OPENAI_API_KEY` and `OPENAI_MODEL` as server environment variables, apply migrations 001–005, and add the deployed URL to Supabase's redirect allowlist. `NEXT_PUBLIC_` values are built into the page, so redeploy after changing them.
+Any Next.js host works with Supabase accounts and `AI_PROVIDER=openai`. A hosted server cannot reach a laptop's Ollama. Hosted AI steps need sign-in or the visitor's own OpenAI key; the local, account-less mode is refused outside loopback development. With no environment variables at all, a hosted copy still runs: browser storage, Simulated preview, and AI steps on visitors' own keys. Set the Supabase URL and publishable key, `OPENAI_API_KEY` and `OPENAI_MODEL` as server environment variables, apply migrations 001–006, and add the deployed URL to Supabase's redirect allowlist. `NEXT_PUBLIC_` values are built into the page, so redeploy after changing them.
 
 ### Public demo: invite-only accounts
 
@@ -252,10 +252,22 @@ Hosted copies explain themselves. An **About this demo** notice (dismissible, re
 - `components/applications-view.tsx`: application list, fit analysis, and each job's preparation plan.
 - `components/preparation-workspace.tsx` and `components/preparation/`: targets, plan generation, review, practice, schedule and tasks.
 - `components/job-import.tsx`, `components/resume-import.tsx`: the import wizards.
-- `supabase/migrations/001–005`: tables, RLS, transactional RPCs and quotas.
+- `supabase/migrations/001–006`: tables, RLS, transactional RPCs and quotas.
 - `evals/`, `scripts/evaluate*.ts`: labelled cases, scorers and the eval harness.
 - `lib/sample-practice.ts`: the sample general-practice content. Replace it with your own.
 
 PDF.js 5.6.205 is vendored as a browser-only package because registry access was unavailable during implementation. Its Apache-2.0 license, upstream attribution and update notes are in `vendor/pdfjs/`; the module and worker are served directly from versioned local assets to avoid rebundling PDF.js’s internal runtime, and fonts/CMaps/WASM are served from `public/pdf-assets`. No CDN code is loaded.
 
 PDF ingestion and inference are separate so parsing errors can be diagnosed without a model call. Portfolio rationale and remaining evaluation work: [CASE-STUDY.md](CASE-STUDY.md).
+
+Preparation navigation follows the selected role: application actions advance from analysis to plan creation to continuing preparation. The Overview shows the selected target and next activity; general samples are secondary. Study activities link directly to their practice questions. Plan review keeps activity editing collapsed and its confirmation action visible.
+
+## Conversational practice
+
+In a job's Interview practice, open the **Mock interview** tab (**Self-assess** holds your written notes and self-scores). Pick the question (it is shown before you start) or start a short mock of up to three questions. **Coach** shows feedback after each answer; **Interview** waits until the end. Each question allows at most two follow-ups. Answers, feedback and repeated attempts are separate from written notes and self-scores. Study activities can open their linked questions directly. Completing a rehearsal remains your decision.
+
+**Review my notes:** In **Self-assess**, after writing notes for a question, choose **Review my notes** for one model call that gives a strength, an improvement and anything to check. The review is saved with that question's progress, shows when your notes have changed since, and never changes your self-scores. **Review again** makes a new call; nothing is retried automatically.
+
+Apply `006_practice_sessions.sql` after migration 005 for account attempt storage and hosted quotas. Browser attempts need no database. Text practice uses the selected Ollama/OpenAI provider, with no fallback. A failed response retains the answer; a failed save offers a save-only retry. See [the session flow and limits](docs/architecture/interview-practice.md). Run `pnpm eval:practice` for synthetic local evaluation; billed comparisons require `--allow-paid`.
+
+**Voice answers:** The interview is a chat: the interviewer's question appears as a message, and you reply in the box below it. With OpenAI selected, press **Record answer** next to Send and record up to two minutes (3 MB). When you press **Stop and transcribe**, the recording is sent once to OpenAI for transcription. This is a separately billed audio request through the server, and its model and per-minute cost are shown while you record; if it fails, the recording is kept so you can retry or discard it; Ollama is never automatically switched to OpenAI. The transcript is added to your answer box, so you can correct it before pressing **Send answer**. The app keeps raw audio only in memory. The speaker button on the interviewer's message reads the question aloud with a local English device voice, when one is available. Recording requires HTTPS or localhost and browser microphone permission. Text remains available if voice is unsupported or denied. Full realtime voice is not implemented.

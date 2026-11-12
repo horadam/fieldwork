@@ -186,7 +186,17 @@ export async function inferenceAccess(
 export type InferenceKind =
   | "resume_extraction"
   | "job_extraction"
-  | "preparation_generation";
+  | "preparation_generation"
+  | "practice_turn"
+  | "practice_audio";
+// "Try again in 12 minutes." from a quota error raised by 007_quota_retry_minutes.sql;
+// older databases give no minutes, so the copy stays general.
+export function retryLater(message: string) {
+  const minutes = Number(/retry in (\d+) minutes?/.exec(message)?.[1]);
+  return minutes > 0
+    ? `Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`
+    : "Try later.";
+}
 // Hosted (signed-in) calls on the server's key spend the per-hour quota in
 // 005_inference_usage.sql. Calls without an account, or on the user's own
 // key, are not metered here.
@@ -201,7 +211,7 @@ export async function reserveInference(
   if (error.message.includes("Hourly"))
     throw new HttpError(
       429,
-      "Hourly limit for this action reached. Try later.",
+      `Hourly limit for this action reached. ${retryLater(error.message)}`,
     );
   throw new HttpError(
     503,

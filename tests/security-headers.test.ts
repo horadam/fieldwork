@@ -98,3 +98,16 @@ describe("response headers", () => {
     );
   });
 });
+
+it("allows opt-in same-origin recording and local audio previews only", () => {
+  const permissions = securityHeaders.find(
+    (h) => h.key === "Permissions-Policy",
+  )!.value;
+  expect(permissions).toContain("microphone=(self)");
+  expect(permissions).toContain("camera=()");
+  const policy = contentSecurityPolicy({ nonce: "test", dev: false });
+  expect(directive(policy, "media-src")).toBe("'self' blob:");
+  expect(directive(policy, "connect-src")).toBe("'self'");
+  expect(directive(policy, "worker-src")).toBe("'self' blob:");
+  expect(directive(policy, "script-src")).toContain("'wasm-unsafe-eval'");
+});

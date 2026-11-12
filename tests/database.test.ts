@@ -35,6 +35,15 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL(
+        "../supabase/migrations/007_quota_retry_minutes.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 }, 30000);
 afterAll(async () => {
   await db.close();
@@ -169,7 +178,7 @@ describe.sequential(
       }
       await expect(
         db.query("select * from start_analysis($1,$2,$3)", [job, "test", "v2"]),
-      ).rejects.toThrow("Hourly");
+      ).rejects.toThrow(/Hourly analysis limit reached; retry in \d+ minutes/);
     });
     it("deleting the job cascades its runs and tasks", async () => {
       await db.query("delete from applications where id=$1", [job]);

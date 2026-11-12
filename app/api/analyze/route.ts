@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { authenticated, body, failure, HttpError } from "@/lib/server";
+import {
+  authenticated,
+  body,
+  failure,
+  HttpError,
+  retryLater,
+} from "@/lib/server";
 import { analyze, ANALYSIS_PROMPT_VERSION } from "@/lib/agent";
 import { AIError, providerError, requestProvider } from "@/lib/ai-provider";
 import type { Experience } from "@/lib/domain";
@@ -26,7 +32,10 @@ export async function POST(req: NextRequest) {
           "An analysis is already running. Wait up to five minutes before retrying.",
         );
       if (reservation.error.message.includes("Hourly"))
-        throw new HttpError(429, "Hourly analysis limit reached. Try later.");
+        throw new HttpError(
+          429,
+          `Hourly analysis limit reached. ${retryLater(reservation.error.message)}`,
+        );
       throw new HttpError(
         400,
         "Could not start analysis. Check the selected job, experience count, and database setup.",

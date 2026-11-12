@@ -6,6 +6,7 @@ import {
   render,
   screen,
   within,
+  waitFor,
 } from "@testing-library/react";
 import { PreparationWorkspace } from "../../components/preparation-workspace";
 import { defaultSettings, planSources } from "../../lib/preparation-plan";
@@ -78,7 +79,10 @@ describe("Preparing for…", () => {
     fireEvent.change(select, { target: { value: "job:job-2" } });
     expect(screen.queryByLabelText(/Actions for/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Remove|Delete/ })).toBeNull();
-    expect(document.body.textContent).toContain("Create your preparation plan");
+    expect(
+      screen.getByRole("button", { name: "Run real analysis" }),
+    ).toBeTruthy();
+    expect(screen.queryByLabelText("Available hours per week")).toBeNull();
     // Nothing is saved just by choosing a role.
     expect(
       JSON.parse(localStorage.getItem("fieldwork-preparation-v1")!).targets,
@@ -103,7 +107,7 @@ describe("Preparing for…", () => {
       "Edit group",
       "Delete group",
     ]);
-    expect(document.body.textContent).toContain("Roles:");
+    expect(screen.getByLabelText("Roles in this group")).toBeTruthy();
   });
 
   it("groups the dropdown into roles and groups", async () => {
@@ -166,5 +170,18 @@ describe("Preparing for…", () => {
     expect(items.map((i) => i.textContent)).toEqual([
       "Delete plan and progress",
     ]);
+    localStorage.setItem(
+      "fieldwork-interviews-v1",
+      JSON.stringify([{ planId: plan.id }, { planId: "another-plan" }]),
+    );
+    fireEvent.click(items[0]);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete plan and progress" }),
+    );
+    await waitFor(() =>
+      expect(
+        JSON.parse(localStorage.getItem("fieldwork-interviews-v1-browser")!),
+      ).toEqual([{ planId: "another-plan" }]),
+    );
   });
 });

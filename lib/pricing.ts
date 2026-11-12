@@ -30,6 +30,13 @@ const OPENAI_PRICES: Record<string, { input: number; output: number }> = {
   "gpt-4o": { input: 2.5, output: 10 },
   "gpt-4o-mini": { input: 0.15, output: 0.6 },
 };
+// Transcription models, kept apart so they are never offered as chat models.
+// Estimated per minute of audio before a call; afterwards its token usage is
+// priced here. Source: PRICING_URL on PRICES_AS_OF (checked 2026-11-09).
+const AUDIO_PRICES: Record<string, { input: number; output: number }> = {
+  "gpt-4o-mini-transcribe": { input: 1.25, output: 5 },
+};
+export const AUDIO_PRICE_PER_MINUTE = 0.003;
 export const PRICED_MODELS = Object.keys(OPENAI_PRICES);
 
 export type Price = { input: number; output: number };
@@ -40,6 +47,7 @@ export function modelPrice(provider: string, model: string): Price | null {
   // Dated snapshots, e.g. gpt-4o-2024-08-06, share their base model's price.
   return (
     OPENAI_PRICES[model] ??
+    AUDIO_PRICES[model] ??
     OPENAI_PRICES[model.replace(/-\d{4}-\d{2}-\d{2}$/, "")] ??
     null
   );
@@ -66,11 +74,17 @@ export function formatCost(usd: number) {
 // Each step's reply limit (its maxTokens) and the tokens its instructions and
 // output schema add on top of the user's text. Instruction sizes were measured
 // on the local evals and rounded up for OpenAI, which also counts the schema.
-export type Step = "resume" | "job" | "analysis" | "preparation";
+export type Step = "resume" | "job" | "analysis" | "preparation" | "practice";
 export const STEPS: Record<
   Step,
   { label: string; maxOutput: number; overhead: number; maxTurns: number }
 > = {
+  practice: {
+    label: "Interview answer",
+    maxOutput: 1800,
+    overhead: 1400,
+    maxTurns: 1,
+  },
   resume: {
     label: "Resume import",
     maxOutput: 6500,
@@ -142,12 +156,17 @@ export function addUsage(total: SessionUsage, call: CallRecord): SessionUsage {
 }
 
 // "1,240 in / 610 out tokens · ≈ $0.0009" for a finished call.
-export function usageLabel(call: CallRecord) {
+// Tokens, then cost when known, as separate facts for a Meta row.
+export function usageParts(call: CallRecord): string[] {
   const tokens = `${call.inputTokens.toLocaleString("en-US")} in / ${call.outputTokens.toLocaleString("en-US")} out tokens`;
-  if (call.provider === "ollama") return `${tokens} · no API cost`;
+  if (call.provider === "ollama") return [tokens, "no API cost"];
   const cost =
     call.provider && call.model
       ? callCost(call.provider, call.model, call.inputTokens, call.outputTokens)
       : null;
-  return cost === null ? tokens : `${tokens} · ≈ ${formatCost(cost)}`;
+  return cost === null ? [tokens] : [tokens, `≈ ${formatCost(cost)}`];
+}
+
+export function usageLabel(call: CallRecord) {
+  return usageParts(call).join(" · ");
 }

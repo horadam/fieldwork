@@ -57,3 +57,5 @@ previews. Rendered layout and visual readability therefore remain unverified;
 parser success does not establish either. Open the Markdown preview in VS Code or
 GitHub to inspect the diagrams. No functional application tests are required for
 these documentation-only changes, and none were run for this documentation pass.
+
+- [Conversational interview practice](interview-practice.md): bounded sessions, follow-ups, feedback, attempt persistence and voice direction.

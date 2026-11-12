@@ -15,7 +15,8 @@
     "eval:job": "node --env-file-if-exists=.env.local --import tsx scripts/evaluate-job.ts",
     "eval:prep": "node --env-file-if-exists=.env.local --import tsx scripts/evaluate-preparation.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "eval:practice": "node --env-file-if-exists=.env.local --import tsx scripts/evaluate-practice.ts"
   },
   "dependencies": {
     "@openai/agents": "0.20.0",

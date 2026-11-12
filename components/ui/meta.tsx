@@ -25,3 +25,11 @@ export function dateRange(start: string, end: string) {
     });
   return start === end ? format(start) : `${format(start)} – ${format(end)}`;
 }
+
+// "Nov 9, 2026, 12:25 PM": a timestamp without seconds, in the viewer's locale.
+export function dateTime(iso: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(iso));
+}
