@@ -1,8 +1,10 @@
 "use client";
+import { Tabs, tabPanelProps } from "./ui/tabs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import type { AiStatus } from "./hooks/use-ai-status";
 import { CostHint } from "./ui/cost-hint";
+import { Meta } from "./ui/meta";
 import type { TabId } from "./shell/tabs";
 import { Dialog } from "./modals/dialog";
 import { ConfirmDeleteBody } from "./modals/confirm-delete";
@@ -10,6 +12,8 @@ import { TargetEditor } from "./preparation/target-editor";
 import { OverflowMenu } from "./ui/overflow-menu";
 import { TimingFields } from "./preparation/timing-fields";
 import { DraftReview } from "./preparation/draft-review";
+import { InterviewSession } from "./preparation/interview-session";
+import { readLocalSessions, writeLocalSessions } from "@/lib/practice-session";
 import { PlanPractice } from "./preparation/plan-practice";
 import { EarlierTasks, PlanSchedule } from "./preparation/plan-views";
 import type { Job, Workspace } from "@/lib/domain";
@@ -38,6 +42,10 @@ import {
 
 type Props = {
   section: TabId;
+  onNavigate?: (tab: TabId) => void;
+  onContext?: (
+    context: { name: string; next: string; targetId: string } | null,
+  ) => void;
   workspace: Workspace;
   token: string;
   scope: string;
@@ -108,6 +116,13 @@ export function PreparationWorkspace(props: Props) {
   const [draft, setDraft] = useState<PreparationPlanVersion | null>(null);
   const [versionId, setVersionId] = useState("");
   const [questionId, setQuestionId] = useState("");
+  const [practiceMode, setPracticeMode] = useState<"notes" | "interview">(
+    "notes",
+  );
+  const [practiceSelection, setPracticeSelection] = useState<{
+    ids: string[];
+    activityId: string;
+  } | null>(null);
   const [edits, setEdits] = useState<Record<string, PreparationProgress>>({});
   const [saveStatus, setSaveStatus] = useState("");
   const [savingActivity, setSavingActivity] = useState<string | null>(null);
@@ -218,6 +233,26 @@ export function PreparationWorkspace(props: Props) {
     : null;
   const problems = target ? sourceProblems(target, workspace) : [];
 
+  const nextActivity = schedule?.weeks
+    .flatMap((w) => w.activityIds)
+    .find((id) => !progress?.done[id]);
+  useEffect(() => {
+    props.onContext?.(
+      target
+        ? {
+            name: target.name,
+            targetId: target.id,
+            next:
+              plan?.output.activities.find((a) => a.id === nextActivity)
+                ?.title ||
+              (plan
+                ? "Review your preparation"
+                : "Create your preparation plan"),
+          }
+        : null,
+    );
+  }, [selected, plan?.id, nextActivity, ready]);
+
   async function work(label: string, action: () => Promise<void>) {
     setBusy(label);
     setError("");
@@ -306,6 +341,8 @@ export function PreparationWorkspace(props: Props) {
 
   function choose(key: string, known?: PreparationTarget) {
     setSelected(key);
+    setPracticeSelection(null);
+    setPracticeMode("notes");
     setVersionId("");
     setQuestionId("");
     setDraft(null);
@@ -439,6 +476,11 @@ export function PreparationWorkspace(props: Props) {
   }
   async function deleteTarget() {
     if (!target) return;
+    const deletedPlanIds = new Set(
+      stateRef.current.plans
+        .filter((p) => p.targetId === target.id)
+        .map((p) => p.id),
+    );
     const done = await work(
       isGroup ? "Deleting group…" : "Deleting plan…",
       async () => {
@@ -456,6 +498,21 @@ export function PreparationWorkspace(props: Props) {
           "delete",
           { id: target.id },
         );
+        if (!token) {
+          try {
+            writeLocalSessions(
+              scope,
+              readLocalSessions(scope).filter(
+                (session) =>
+                  !deletedPlanIds.has(
+                    String((session as { planId?: unknown }).planId),
+                  ),
+              ),
+            );
+          } catch {
+            /* Unreadable attempts are left for the interview view to report. */
+          }
+        }
         // A role stays selected, ready for a new plan; a deleted group is gone.
         choose(isGroup ? "general" : selected);
       },
@@ -471,6 +528,12 @@ export function PreparationWorkspace(props: Props) {
       disabled: !!busy || readOnly,
       savingId: savingActivity,
       onToggle: toggleActivity,
+      onPractice: (ids: string[], activityId: string) => {
+        setPracticeSelection({ ids, activityId });
+        setPracticeMode("interview");
+        setQuestionId(ids[0]);
+        props.onNavigate?.("practice");
+      },
     };
   return (
     <section className="preparation-workspace">
@@ -547,17 +610,18 @@ export function PreparationWorkspace(props: Props) {
               </button>
             </div>
             {target && isGroup && (
-              <p className="tiny muted">
-                Roles:{" "}
-                {target.jobIds
-                  .map((id) => {
-                    const job = workspace.jobs.find((j) => j.id === id);
-                    return job
-                      ? `${job.company} · ${job.role}`
-                      : "Deleted application";
-                  })
-                  .join(" / ")}
-              </p>
+              <div className="chip-row" aria-label="Roles in this group">
+                {target.jobIds.map((id) => {
+                  const job = workspace.jobs.find((j) => j.id === id);
+                  return (
+                    <span className="chip" key={id}>
+                      {job
+                        ? `${job.company} · ${job.role}`
+                        : "Deleted application"}
+                    </span>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
@@ -634,8 +698,29 @@ export function PreparationWorkspace(props: Props) {
                 remain available; generate and review a new version when ready.
               </p>
             )}
+            {!plan && (
+              <ol className="prep-steps" aria-label="Preparation steps">
+                <li aria-current={problems.length ? "step" : undefined}>
+                  1. Check requirements
+                </li>
+                <li
+                  aria-current={!problems.length && !draft ? "step" : undefined}
+                >
+                  2. Set available time
+                </li>
+                <li aria-current={draft ? "step" : undefined}>
+                  3. Review plan
+                </li>
+              </ol>
+            )}
             {problems.map((problem) => (
               <div className="notice" key={problem.jobId}>
+                {/* The heading names a single role; a group needs each name. */}
+                {problem.label && target && target.jobIds.length > 1 && (
+                  <p>
+                    <strong>{problem.label}</strong>
+                  </p>
+                )}
                 <p>{problem.message}</p>
                 {workspace.jobs.find((j) => j.id === problem.jobId) && (
                   <button
@@ -652,32 +737,38 @@ export function PreparationWorkspace(props: Props) {
                 )}
               </div>
             ))}
-            <details open={!plan && !draft}>
-              <summary>
-                {plan ? "Generate new version" : "Create your preparation plan"}
-              </summary>
-              <p className="tiny muted">
-                One explicit call with {props.provider}. Review before
-                activation. Existing plans are never replaced automatically.
-              </p>
-              <TimingFields
-                value={settings}
-                onChange={setSettings}
-                disabled={!!busy}
-              />
-              <button
-                className="button"
-                disabled={!!busy || problems.length > 0}
-                onClick={() => void generate()}
-              >
-                Generate {plan ? "new version" : "preparation plan"}
-              </button>
-              <CostHint
-                ai={props.ai ?? null}
-                step="preparation"
-                sourceChars={sourceChars(workspace, target.jobIds)}
-              />
-            </details>
+            {!problems.length && (
+              <details open={!plan && !draft}>
+                <summary>
+                  {plan
+                    ? "Generate new version"
+                    : "Create your preparation plan"}
+                </summary>
+                <p className="tiny muted">
+                  Choose your time budget. You can edit the generated plan
+                  before using it.
+                  {plan &&
+                    " Your current plan stays available until you choose its replacement."}
+                </p>
+                <TimingFields
+                  value={settings}
+                  onChange={setSettings}
+                  disabled={!!busy}
+                />
+                <button
+                  className="button"
+                  disabled={!!busy || problems.length > 0}
+                  onClick={() => void generate()}
+                >
+                  Generate {plan ? "new version" : "preparation plan"}
+                </button>
+                <CostHint
+                  ai={props.ai ?? null}
+                  step="preparation"
+                  sourceChars={sourceChars(workspace, target.jobIds)}
+                />
+              </details>
+            )}
           </>
         )}
       </div>
@@ -692,33 +783,87 @@ export function PreparationWorkspace(props: Props) {
       )}
       {target && plan && checklist && (
         <>
-          <div className="notice">
-            {readOnly ? "Previous version · read-only" : "Active plan"} ·{" "}
-            {plan.settings.startDate} · {plan.metadata.provider} /{" "}
-            {plan.metadata.model}
-          </div>
+          <h2>Preparation for {target.name}</h2>
+          <Meta
+            items={[
+              readOnly ? "Previous version · read-only" : "Active plan",
+              `Starts ${plan.settings.startDate}`,
+              plan.metadata.provider,
+              plan.metadata.model,
+            ]}
+          />
           {props.section === "practice" && (
-            <PlanPractice
-              plan={plan}
-              progress={checklist.progress}
-              questionId={questionId}
-              onQuestion={setQuestionId}
-              readOnly={readOnly}
-              saveStatus={saveStatus}
-              onChange={(next) =>
-                setEdits((old) => ({ ...old, [next.planId]: next }))
-              }
-            />
+            <>
+              <Tabs
+                id="practice"
+                label="Practice method"
+                items={[
+                  { id: "notes", label: "Self-assess" },
+                  { id: "interview", label: "Mock interview" },
+                ]}
+                value={practiceMode}
+                onChange={setPracticeMode}
+              />
+              <div {...tabPanelProps("practice", practiceMode)}>
+                {practiceMode === "interview" && (
+                  <InterviewSession
+                    key={`${props.scope}:${plan.id}`}
+                    plan={plan}
+                    token={token}
+                    scope={props.scope}
+                    ai={props.ai}
+                    questionIds={
+                      practiceSelection?.ids || [
+                        questionId || plan.output.questions[0].id,
+                      ]
+                    }
+                    activityId={practiceSelection?.activityId || null}
+                    readOnly={readOnly}
+                    onComplete={(id) => void toggleActivity(id, true)}
+                    completedActivities={progress?.done || {}}
+                  />
+                )}
+                {practiceMode === "notes" && (
+                  <PlanPractice
+                    plan={plan}
+                    progress={checklist.progress}
+                    questionId={questionId}
+                    onQuestion={setQuestionId}
+                    readOnly={readOnly}
+                    saveStatus={saveStatus}
+                    onChange={(next) =>
+                      setEdits((old) => ({ ...old, [next.planId]: next }))
+                    }
+                    // Merged into the latest progress, so edits made while
+                    // the review ran are kept.
+                    onReview={(questionId, review) =>
+                      setEdits((old) => {
+                        const base = old[plan.id] || checklist.progress;
+                        return {
+                          ...old,
+                          [plan.id]: {
+                            ...base,
+                            reviews: { ...base.reviews, [questionId]: review },
+                          },
+                        };
+                      })
+                    }
+                    token={token}
+                    ai={props.ai}
+                  />
+                )}
+              </div>
+            </>
           )}
           {props.section === "study" && schedule && (
             <PlanSchedule {...checklist} schedule={schedule} />
           )}
         </>
       )}
-      {target && !plan && !draft && (
+      {target && !plan && !draft && !problems.length && (
         <p className="notice">
-          No active plan yet. Complete the source analyses, choose your time
-          budget, then generate and review a plan.
+          Your questions and schedule will appear here after you review and
+          start your plan.
         </p>
       )}
       {target && props.section === "study" && (
@@ -748,8 +893,8 @@ export function PreparationWorkspace(props: Props) {
             }
             consequence={
               isGroup
-                ? "This deletes the group, all its plan versions, and their progress. Applications and earlier analysis tasks remain."
-                : "This deletes this role's plan versions and their progress. The role stays in the list, ready for a new plan."
+                ? "This deletes the group, all its plan versions, their progress, and interview attempts. Applications and earlier analysis tasks remain."
+                : "This deletes this role's plan versions, their progress, and interview attempts. The role stays in the list, ready for a new plan."
             }
             onConfirm={() => void deleteTarget()}
             onCancel={() => setConfirmDelete(false)}

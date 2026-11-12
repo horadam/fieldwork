@@ -160,7 +160,7 @@ it("sends the link keys and reports repairs with the draft", async () => {
   expect(result.metadata.repairs).toEqual([
     "Removed 1 experience link the analysis didn't cite for that job.",
   ]);
-  expect(result.metadata.promptVersion).toBe("preparation-v2");
+  expect(result.metadata.promptVersion).toBe("preparation-v3");
 });
 it("names the reason when a plan can't be used", async () => {
   const sources = await planSources(target, workspace());
@@ -183,4 +183,30 @@ it("names the reason when a plan can't be used", async () => {
       "no question was linked to a real requirement",
     ),
   });
+});
+
+it("adds a disclosed rehearsal when a generated plan omits question practice", async () => {
+  const sources = await planSources(target, workspace()),
+    reply = modelReply();
+  reply.activities = reply.activities.filter(
+    (a) => a.type !== "question_practice",
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        message: { content: JSON.stringify(reply) },
+        done: true,
+      }),
+    ),
+  );
+  const result = await generatePreparation(sources, settings, config);
+  expect(
+    result.output.activities.some(
+      (a) => a.type === "question_practice" && a.questionIds.includes("q1"),
+    ),
+  ).toBe(true);
+  expect(result.metadata.repairs.join(" ")).toContain(
+    "Added a 15-minute rehearsal",
+  );
 });

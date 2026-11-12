@@ -49,9 +49,8 @@ export const tabs: {
     id: "study",
     label: "Study plan",
     icon: "M5 4h10l4 4v12H5zM9 12h6M9 16h6",
-    title: "Four weeks. Steady progress.",
-    subtitle:
-      "10–15 hours a week, with something concrete to show for each one.",
+    title: "Your preparation schedule.",
+    subtitle: "Choose a role, then work through the plan at your pace.",
   },
 ];
 

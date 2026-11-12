@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useState } from "react";
+import { Tabs, tabPanelProps } from "./ui/tabs";
+import { Meta, dateTime } from "./ui/meta";
 import {
   fitCoverage,
   type Analysis,
@@ -7,8 +9,12 @@ import {
   type Run,
   type Workspace as Data,
 } from "@/lib/domain";
-import { usageLabel } from "@/lib/pricing";
-import type { PlanSummary } from "@/lib/preparation-plan";
+import { usageParts } from "@/lib/pricing";
+import {
+  analysisProblem,
+  matchingRun,
+  type PlanSummary,
+} from "@/lib/preparation-plan";
 import { signupsOpen } from "@/lib/deployment";
 import type { AiStatus } from "./hooks/use-ai-status";
 import { CostHint } from "./ui/cost-hint";
@@ -29,16 +35,18 @@ const statusLabel = {
 const isSimulated = (run: Run) =>
   run.provider === "simulated" || run.model === "none";
 
-function fitLabel(run: Run | undefined) {
-  if (!run?.output) return "—";
+// Short fit summary for a list row; null when the job has no analysis yet.
+export function fitLabel(run: Run | undefined) {
+  if (!run?.output) return null;
   if (isSimulated(run)) return "Preview";
   const c = fitCoverage(run.output);
   return `${c.supported}/${c.total}`;
 }
 
-function runMeta(run: Run) {
-  const when = new Date(run.created_at).toLocaleString();
-  if (isSimulated(run)) return `Simulated preview · no model called · ${when}`;
+// The facts about one run, rendered as a Meta row.
+export function runMeta(run: Run): string[] {
+  const when = dateTime(run.created_at);
+  if (isSimulated(run)) return ["Simulated preview", "no model called", when];
   const duration =
     run.status === "running" || run.status === "pending"
       ? "in progress"
@@ -47,15 +55,20 @@ function runMeta(run: Run) {
         : "duration not recorded";
   const usage =
     run.input_tokens || run.output_tokens
-      ? ` · ${usageLabel({
+      ? usageParts({
           provider: run.provider || "openai",
           model: run.model,
           inputTokens: run.input_tokens || 0,
           outputTokens: run.output_tokens || 0,
-        })}`
-      : "";
-  return `${run.provider || "openai"} · ${run.model} · ${when} · ${duration}${usage}`;
+        })
+      : [];
+  return [run.provider || "openai", run.model, when, duration, ...usage];
 }
+
+const statusChip = (label: string) => (
+  <span className="chip quiet">{label}</span>
+);
+const notAnalyzed = statusChip("Not analyzed");
 
 export function ApplicationsView({
   workspace,
@@ -95,11 +108,6 @@ export function ApplicationsView({
   const [search, setSearch] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
   const [section, setSection] = useState<Section>("fit");
-  const tabRefs = useRef<Record<Section, HTMLButtonElement | null>>({
-    jd: null,
-    fit: null,
-    plan: null,
-  });
 
   // A newly started or explicitly opened run should be visible immediately.
   useEffect(() => {
@@ -142,16 +150,6 @@ export function ApplicationsView({
     setJobId(id);
     onSelectRun(null);
   }
-  function tabKey(event: KeyboardEvent<HTMLDivElement>) {
-    const step =
-      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (!step) return;
-    event.preventDefault();
-    const index = sections.findIndex((s) => s.id === section);
-    const next = sections[(index + step + sections.length) % sections.length];
-    setSection(next.id);
-    tabRefs.current[next.id]?.focus();
-  }
 
   const analyzeButton = job && (
     <button
@@ -168,6 +166,44 @@ export function ApplicationsView({
     </button>
   );
 
+  const activePrep = preparation.find(
+    (p) => p.jobIds.includes(job?.id ?? "") && p.plan,
+  );
+  const fresh = job && matchingRun(job.id, workspace);
+  // A completed real run that no longer matches the JD or experience bank.
+  const stale =
+    !!job &&
+    !fresh &&
+    runs.some((r) => r.status === "completed" && r.output && !isSimulated(r));
+  const jobPlans = job
+    ? preparation.filter((t) => t.jobIds.includes(job.id))
+    : [];
+  // The visible empty state already carries the next action with its
+  // explanation, so the header shows status instead of a second button.
+  const emptyCarriesAction =
+    !activePrep &&
+    ((section === "fit" && !run) ||
+      (section === "plan" && !jobPlans.length && !fresh));
+  const nextAction =
+    job &&
+    (activePrep ? (
+      <button
+        className="button green"
+        onClick={() => onOpenTarget(activePrep.targetId)}
+      >
+        Continue preparation
+      </button>
+    ) : fresh ? (
+      <button
+        className="button green"
+        disabled={busy}
+        onClick={() => onPrepare(job)}
+      >
+        Create preparation plan
+      </button>
+    ) : (
+      analyzeButton
+    ));
   return (
     <div className="apps">
       <section className="apps-list" aria-label="Applications">
@@ -197,7 +233,9 @@ export function ApplicationsView({
               <span className="badge">{j.stage}</span>
               <span className="apps-row-company">{j.company}</span>
               <span className="apps-row-fit">
-                {runningJob === j.id ? "…" : fitLabel(latestOutput(j.id))}
+                {runningJob === j.id
+                  ? "…"
+                  : (fitLabel(latestOutput(j.id)) ?? notAnalyzed)}
               </span>
             </span>
           </button>
@@ -215,16 +253,26 @@ export function ApplicationsView({
               {job.notes && <p className="tiny muted">{job.notes}</p>}
             </div>
             <div className="actions">
-              {analyzeButton}
+              {emptyCarriesAction
+                ? stale
+                  ? statusChip("Analysis out of date")
+                  : notAnalyzed
+                : nextAction}
               <OverflowMenu
                 label="More actions"
                 items={[
+                  {
+                    label: "Re-run fit analysis",
+                    onSelect: () => onAnalyze(job),
+                    disabled: busy || !aiReady,
+                  },
                   {
                     label: "Prepare for this job",
                     onSelect: () => onPrepare(job),
                     disabled: busy,
                   },
-                  ...(mode === "demo"
+                  // Only for browser-mode visitors without a usable model.
+                  ...(mode === "demo" && !aiReady
                     ? [
                         {
                           label: "Simulated preview (no model)",
@@ -243,6 +291,9 @@ export function ApplicationsView({
               />
             </div>
           </div>
+          {stale && (
+            <p className="notice">{analysisProblem(job.id, workspace)}</p>
+          )}
           {!aiReady ? (
             <p className="tiny muted">
               Analysis needs a model.{" "}
@@ -265,37 +316,15 @@ export function ApplicationsView({
             />
           )}
 
-          <div
-            className="apps-tabs"
-            role="tablist"
-            aria-label="Application sections"
-            onKeyDown={tabKey}
-          >
-            {sections.map((s) => (
-              <button
-                key={s.id}
-                ref={(el) => {
-                  tabRefs.current[s.id] = el;
-                }}
-                id={`apps-tab-${s.id}`}
-                role="tab"
-                aria-selected={section === s.id}
-                aria-controls="apps-panel"
-                tabIndex={section === s.id ? 0 : -1}
-                className={section === s.id ? "selected" : undefined}
-                onClick={() => setSection(s.id)}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+          <Tabs
+            id="apps"
+            label="Application sections"
+            items={sections}
+            value={section}
+            onChange={setSection}
+          />
 
-          <div
-            id="apps-panel"
-            role="tabpanel"
-            aria-labelledby={`apps-tab-${section}`}
-            className="apps-panel"
-          >
+          <div {...tabPanelProps("apps", section)} className="apps-panel">
             {section === "jd" && <p className="jd-text">{job.jd}</p>}
 
             {section === "fit" && !run && (
@@ -305,14 +334,14 @@ export function ApplicationsView({
                   Compare this job description with your confirmed experience.
                   The analysis shows which requirements your experience meets.
                 </p>
-                {analyzeButton}
+                {nextAction}
               </div>
             )}
 
             {section === "fit" && run && (
               <>
                 <div className="run-meta">
-                  <p className="tiny muted">{runMeta(run)}</p>
+                  <Meta items={runMeta(run)} />
                   {runs.length > 1 && (
                     <label className="tiny muted">
                       Run{" "}
@@ -322,7 +351,7 @@ export function ApplicationsView({
                       >
                         {runs.map((r) => (
                           <option key={r.id} value={r.id}>
-                            {new Date(r.created_at).toLocaleString()} ·{" "}
+                            {dateTime(r.created_at)} ·{" "}
                             {isSimulated(r) ? "simulated" : r.status}
                           </option>
                         ))}
@@ -347,10 +376,9 @@ export function ApplicationsView({
 
             {section === "plan" && (
               <PrepPlan
-                summaries={preparation.filter((t) => t.jobIds.includes(job.id))}
-                hasRealAnalysis={runs.some(
-                  (r) => r.status === "completed" && !isSimulated(r),
-                )}
+                summaries={jobPlans}
+                problem={analysisProblem(job.id, workspace)}
+                analyzeButton={analyzeButton}
                 busy={busy}
                 onPrepare={() => onPrepare(job)}
                 onOpenTarget={onOpenTarget}
@@ -367,13 +395,16 @@ export function ApplicationsView({
 // longer carry a separately approved plan.
 function PrepPlan({
   summaries,
-  hasRealAnalysis,
+  problem,
+  analyzeButton,
   busy,
   onPrepare,
   onOpenTarget,
 }: {
   summaries: PlanSummary[];
-  hasRealAnalysis: boolean;
+  // Why there is no current real analysis; null when one exists.
+  problem: string | null;
+  analyzeButton: React.ReactNode;
   busy: boolean;
   onPrepare: () => void;
   onOpenTarget: (targetId: string) => void;
@@ -385,11 +416,18 @@ function PrepPlan({
         <p className="tiny muted">
           Prepare for this job turns its fit analysis into interview questions
           and practice activities, scheduled around the time you have.
-          {!hasRealAnalysis && " It needs a completed real analysis first."}
         </p>
-        <button className="button" disabled={busy} onClick={onPrepare}>
-          Prepare for this job
-        </button>
+        {/* Without a current analysis, preparing would only send the user back here. */}
+        {problem ? (
+          <>
+            <p className="tiny muted">{problem}</p>
+            {analyzeButton}
+          </>
+        ) : (
+          <button className="button" disabled={busy} onClick={onPrepare}>
+            Prepare for this job
+          </button>
+        )}
       </div>
     );
   return (
@@ -398,11 +436,20 @@ function PrepPlan({
         <div className="list-row" key={s.targetId}>
           <div className="grow">
             <strong>{s.name}</strong>
-            <p className="tiny muted">
-              {s.plan
-                ? `Active plan from ${new Date(s.plan.createdAt).toLocaleDateString()} · ${s.plan.questions} questions · ${s.plan.remaining} of ${s.plan.scheduled} scheduled activities left`
-                : "No active plan yet. Generate and review one in Interview practice."}
-            </p>
+            {s.plan ? (
+              <Meta
+                items={[
+                  `Active plan from ${new Date(s.plan.createdAt).toLocaleDateString()}`,
+                  `${s.plan.questions} questions`,
+                  `${s.plan.remaining} of ${s.plan.scheduled} activities left`,
+                ]}
+              />
+            ) : (
+              <p className="tiny muted">
+                No active plan yet. Generate and review one in Interview
+                practice.
+              </p>
+            )}
           </div>
           <button
             className="button secondary small"

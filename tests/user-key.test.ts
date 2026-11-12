@@ -1,3 +1,4 @@
+import OpenAI from "openai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({ extractResume: vi.fn() }));
@@ -96,6 +97,42 @@ describe("a visitor's own OpenAI key", () => {
       expect(error.message).not.toContain(key);
     },
   );
+
+  it.each([
+    [400, "openai_request_rejected", 400],
+    [503, "openai_server_error", 502],
+  ])(
+    "names OpenAI HTTP %i instead of a generic failure",
+    (httpStatus, code, status) => {
+      const config = requestProvider(new Headers(withKey));
+      const error = providerError(config, {
+        status: httpStatus,
+        message: `Incorrect API key provided: ${key}`,
+      });
+      expect(error).toMatchObject({ code, status });
+      expect(error.message).toContain(`OpenAI ${httpStatus}`);
+      expect(error.message).not.toContain(key);
+    },
+  );
+
+  it("recognises the SDK's own timeout and connection errors", () => {
+    const config = requestProvider(new Headers(withKey));
+    expect(
+      providerError(config, new OpenAI.APIConnectionTimeoutError()),
+    ).toMatchObject({ code: "inference_timeout", status: 504 });
+    const lost = providerError(
+      config,
+      new OpenAI.APIConnectionError({
+        cause: Object.assign(new Error(key), { code: "ECONNRESET" }),
+      }),
+    );
+    expect(lost).toMatchObject({ code: "openai_unreachable", status: 503 });
+    expect(lost.message).toContain("ECONNRESET");
+    expect(lost.message).not.toContain(key);
+    const other = providerError(config, new TypeError(key));
+    expect(other.message).toContain("(TypeError)");
+    expect(other.message).not.toContain(key);
+  });
 
   it("reports readiness without a test call or the key", async () => {
     const fetcher = vi.fn();

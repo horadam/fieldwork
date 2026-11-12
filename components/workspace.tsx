@@ -69,6 +69,13 @@ export default function Workspace() {
     null,
   );
   const [planSummaries, setPlanSummaries] = useState<PlanSummary[]>([]);
+  const [prepContext, setPrepContext] = useState<{
+    name: string;
+    next: string;
+    targetId: string;
+  } | null>(null);
+  // Entries saved by the last resume import, until dismissed or navigated away.
+  const [imported, setImported] = useState<number | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const navigated = useRef(false);
   const current = tabById(tab);
@@ -80,6 +87,7 @@ export default function Workspace() {
   function navigate(next: TabId) {
     navigated.current = true;
     setStatusOpen(false);
+    setImported(null);
     setTab(next);
     ws.setSelectedRun(null);
     ws.setError("");
@@ -88,8 +96,13 @@ export default function Workspace() {
     ws.setError("");
     setModal(next);
   }
+  // An error belongs to the dialog that raised it; don't leave it on the page.
+  const dismiss = () => {
+    ws.setError("");
+    setModal(null);
+  };
   const close = () => {
-    if (!ws.busy) setModal(null);
+    if (!ws.busy) dismiss();
   };
   const addRecord = (entity: Entity) =>
     open({
@@ -156,9 +169,13 @@ export default function Workspace() {
                 : current.label}
             </div>
             <h1 ref={heading} tabIndex={-1}>
-              {current.title}
+              {tab === "study" && prepContext ? "Preparation" : current.title}
             </h1>
-            <p className="sub">{current.subtitle}</p>
+            <p className="sub">
+              {tab === "study" && prepContext
+                ? prepContext.name
+                : current.subtitle}
+            </p>
           </div>
           {tab === "applications" && (
             <div className="actions">
@@ -208,12 +225,52 @@ export default function Workspace() {
 
         {tab === "overview" && (
           <OverviewView
+            context={prepContext}
+            onContinue={() => {
+              if (prepContext) setPreparationTarget(prepContext.targetId);
+              navigate("study");
+            }}
             data={ws.data}
             planSummaries={planSummaries}
             studyDone={studyDone}
             studyTotal={studyTotal}
             onNavigate={navigate}
           />
+        )}
+        {tab === "experience" && imported !== null && (
+          <div role="status" className="notice">
+            <p>
+              Imported {imported} {imported === 1 ? "entry" : "entries"} into
+              your experience bank.
+            </p>
+            <div className="actions">
+              {ws.data.jobs.length ? (
+                <button
+                  className="button small"
+                  onClick={() => navigate("applications")}
+                >
+                  Go to applications
+                </button>
+              ) : (
+                <button
+                  className="button small"
+                  disabled={ws.busy}
+                  onClick={() => {
+                    setImported(null);
+                    addRecord("job");
+                  }}
+                >
+                  Add application
+                </button>
+              )}
+              <button
+                className="button secondary small"
+                onClick={() => setImported(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
         )}
         {tab === "experience" && (
           <ExperienceView
@@ -258,6 +315,8 @@ export default function Workspace() {
         {/* Stays mounted across tabs so unsaved preparation edits survive. */}
         <PreparationWorkspace
           key={`${ws.mode}:${ws.email}`}
+          onNavigate={navigate}
+          onContext={setPrepContext}
           section={tab}
           workspace={ws.data}
           token={ws.token}
@@ -299,10 +358,20 @@ export default function Workspace() {
           />
         )}
         <footer>
-          FIELDWORK · Built for deliberate progress.{" "}
-          {ws.mode === "demo"
-            ? "Workspace data and practice notes stay in this browser."
-            : "Workspace records use your authenticated account. Practice notes stay in this browser."}
+          <p>FIELDWORK. Built for deliberate progress.</p>
+          {ws.mode === "demo" ? (
+            <p className="tiny muted">
+              Workspace data and practice notes stay in this browser.{" "}
+              <button className="link" onClick={() => open({ type: "auth" })}>
+                Sign in to keep them in an account
+              </button>
+            </p>
+          ) : (
+            <p className="tiny muted">
+              Workspace records use your authenticated account. Practice notes
+              stay in this browser.
+            </p>
+          )}
         </footer>
       </main>
 
@@ -317,7 +386,7 @@ export default function Workspace() {
                 ws.request(path, { body: value, signal })
               }
               confirm={ws.importJob}
-              close={() => setModal(null)}
+              close={() => dismiss()}
             />
           ) : modal.type === "resume-import" ? (
             <ResumeImport
@@ -327,8 +396,11 @@ export default function Workspace() {
               request={(source, signal) =>
                 ws.request("/api/resume/extract", { body: source, signal })
               }
-              confirm={ws.importExperience}
-              close={() => setModal(null)}
+              confirm={async (batch) => {
+                await ws.importExperience(batch);
+                setImported(batch.entries.length);
+              }}
+              close={() => dismiss()}
             />
           ) : modal.type === "auth" ? (
             <AuthFormBody
@@ -337,12 +409,12 @@ export default function Workspace() {
               busy={ws.busy}
               onSubmit={async (credentials, signup) => {
                 const outcome = await ws.authenticate(credentials, signup);
-                if (outcome === "signed-in") setModal(null);
+                if (outcome === "signed-in") dismiss();
                 return outcome;
               }}
             />
           ) : modal.type === "openai-key" ? (
-            <KeyForm onDone={() => setModal(null)} />
+            <KeyForm onDone={() => dismiss()} />
           ) : modal.type === "delete" ? (
             <ConfirmDeleteBody
               busy={ws.busy}
@@ -352,8 +424,7 @@ export default function Workspace() {
                   : "Previous analysis runs keep their saved evidence snapshot."
               }
               onConfirm={async () => {
-                if (await ws.removeRecord(modal.entity, modal.id))
-                  setModal(null);
+                if (await ws.removeRecord(modal.entity, modal.id)) dismiss();
               }}
               onCancel={close}
             />
@@ -368,7 +439,7 @@ export default function Workspace() {
                   createId: modal.createId,
                   value,
                 });
-                if (saved) setModal(null);
+                if (saved) dismiss();
               }}
             />
           )}

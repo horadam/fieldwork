@@ -17,7 +17,7 @@ sequenceDiagram
   participant DB as Supabase Postgres
   participant Agent as analyze() and read-only tools
   participant Model as Configured Ollama or OpenAI
-  alt Explicit simulated preview in browser mode
+  alt Explicit simulated preview in browser mode, offered only while no model is ready
     User->>UI: Choose ⋯ → Simulated preview (no model)
     UI->>UI: demoAnalysis() creates template output
     UI->>UI: Persist labeled simulated run in browser storage
