@@ -9,8 +9,12 @@ import {
   type Run,
   type Workspace as Data,
 } from "@/lib/domain";
-import { usageLabel } from "@/lib/pricing";
-import { matchingRun, type PlanSummary } from "@/lib/preparation-plan";
+import { usageParts } from "@/lib/pricing";
+import {
+  analysisProblem,
+  matchingRun,
+  type PlanSummary,
+} from "@/lib/preparation-plan";
 import { signupsOpen } from "@/lib/deployment";
 import type { AiStatus } from "./hooks/use-ai-status";
 import { CostHint } from "./ui/cost-hint";
@@ -31,16 +35,18 @@ const statusLabel = {
 const isSimulated = (run: Run) =>
   run.provider === "simulated" || run.model === "none";
 
-function fitLabel(run: Run | undefined) {
-  if (!run?.output) return "—";
+// Short fit summary for a list row; null when the job has no analysis yet.
+export function fitLabel(run: Run | undefined) {
+  if (!run?.output) return null;
   if (isSimulated(run)) return "Preview";
   const c = fitCoverage(run.output);
   return `${c.supported}/${c.total}`;
 }
 
-function runMeta(run: Run) {
+// The facts about one run, rendered as a Meta row.
+export function runMeta(run: Run): string[] {
   const when = dateTime(run.created_at);
-  if (isSimulated(run)) return `Simulated preview · no model called · ${when}`;
+  if (isSimulated(run)) return ["Simulated preview", "no model called", when];
   const duration =
     run.status === "running" || run.status === "pending"
       ? "in progress"
@@ -49,15 +55,20 @@ function runMeta(run: Run) {
         : "duration not recorded";
   const usage =
     run.input_tokens || run.output_tokens
-      ? ` · ${usageLabel({
+      ? usageParts({
           provider: run.provider || "openai",
           model: run.model,
           inputTokens: run.input_tokens || 0,
           outputTokens: run.output_tokens || 0,
-        })}`
-      : "";
-  return `${run.provider || "openai"} · ${run.model} · ${when} · ${duration}${usage}`;
+        })
+      : [];
+  return [run.provider || "openai", run.model, when, duration, ...usage];
 }
+
+const statusChip = (label: string) => (
+  <span className="chip quiet">{label}</span>
+);
+const notAnalyzed = statusChip("Not analyzed");
 
 export function ApplicationsView({
   workspace,
@@ -159,6 +170,20 @@ export function ApplicationsView({
     (p) => p.jobIds.includes(job?.id ?? "") && p.plan,
   );
   const fresh = job && matchingRun(job.id, workspace);
+  // A completed real run that no longer matches the JD or experience bank.
+  const stale =
+    !!job &&
+    !fresh &&
+    runs.some((r) => r.status === "completed" && r.output && !isSimulated(r));
+  const jobPlans = job
+    ? preparation.filter((t) => t.jobIds.includes(job.id))
+    : [];
+  // The visible empty state already carries the next action with its
+  // explanation, so the header shows status instead of a second button.
+  const emptyCarriesAction =
+    !activePrep &&
+    ((section === "fit" && !run) ||
+      (section === "plan" && !jobPlans.length && !fresh));
   const nextAction =
     job &&
     (activePrep ? (
@@ -208,7 +233,9 @@ export function ApplicationsView({
               <span className="badge">{j.stage}</span>
               <span className="apps-row-company">{j.company}</span>
               <span className="apps-row-fit">
-                {runningJob === j.id ? "…" : fitLabel(latestOutput(j.id))}
+                {runningJob === j.id
+                  ? "…"
+                  : (fitLabel(latestOutput(j.id)) ?? notAnalyzed)}
               </span>
             </span>
           </button>
@@ -226,7 +253,11 @@ export function ApplicationsView({
               {job.notes && <p className="tiny muted">{job.notes}</p>}
             </div>
             <div className="actions">
-              {nextAction}
+              {emptyCarriesAction
+                ? stale
+                  ? statusChip("Analysis out of date")
+                  : notAnalyzed
+                : nextAction}
               <OverflowMenu
                 label="More actions"
                 items={[
@@ -260,6 +291,9 @@ export function ApplicationsView({
               />
             </div>
           </div>
+          {stale && (
+            <p className="notice">{analysisProblem(job.id, workspace)}</p>
+          )}
           {!aiReady ? (
             <p className="tiny muted">
               Analysis needs a model.{" "}
@@ -307,7 +341,7 @@ export function ApplicationsView({
             {section === "fit" && run && (
               <>
                 <div className="run-meta">
-                  <p className="tiny muted">{runMeta(run)}</p>
+                  <Meta items={runMeta(run)} />
                   {runs.length > 1 && (
                     <label className="tiny muted">
                       Run{" "}
@@ -342,10 +376,9 @@ export function ApplicationsView({
 
             {section === "plan" && (
               <PrepPlan
-                summaries={preparation.filter((t) => t.jobIds.includes(job.id))}
-                hasRealAnalysis={runs.some(
-                  (r) => r.status === "completed" && !isSimulated(r),
-                )}
+                summaries={jobPlans}
+                problem={analysisProblem(job.id, workspace)}
+                analyzeButton={analyzeButton}
                 busy={busy}
                 onPrepare={() => onPrepare(job)}
                 onOpenTarget={onOpenTarget}
@@ -362,13 +395,16 @@ export function ApplicationsView({
 // longer carry a separately approved plan.
 function PrepPlan({
   summaries,
-  hasRealAnalysis,
+  problem,
+  analyzeButton,
   busy,
   onPrepare,
   onOpenTarget,
 }: {
   summaries: PlanSummary[];
-  hasRealAnalysis: boolean;
+  // Why there is no current real analysis; null when one exists.
+  problem: string | null;
+  analyzeButton: React.ReactNode;
   busy: boolean;
   onPrepare: () => void;
   onOpenTarget: (targetId: string) => void;
@@ -380,11 +416,18 @@ function PrepPlan({
         <p className="tiny muted">
           Prepare for this job turns its fit analysis into interview questions
           and practice activities, scheduled around the time you have.
-          {!hasRealAnalysis && " It needs a completed real analysis first."}
         </p>
-        <button className="button" disabled={busy} onClick={onPrepare}>
-          Prepare for this job
-        </button>
+        {/* Without a current analysis, preparing would only send the user back here. */}
+        {problem ? (
+          <>
+            <p className="tiny muted">{problem}</p>
+            {analyzeButton}
+          </>
+        ) : (
+          <button className="button" disabled={busy} onClick={onPrepare}>
+            Prepare for this job
+          </button>
+        )}
       </div>
     );
   return (

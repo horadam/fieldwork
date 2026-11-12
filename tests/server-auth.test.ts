@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { authenticated } from "../lib/server";
 
@@ -28,4 +28,17 @@ it("requires a bearer token before contacting Supabase", async () => {
   });
   expect(fetcher).not.toHaveBeenCalled();
   vi.unstubAllGlobals();
+});
+
+describe("retryLater", () => {
+  it("names the minutes a quota error gives, and stays general without them", async () => {
+    const { retryLater } = await import("../lib/server");
+    expect(
+      retryLater("Hourly analysis limit reached; retry in 12 minutes"),
+    ).toBe("Try again in 12 minutes.");
+    expect(
+      retryLater("Hourly inference limit reached; retry in 1 minutes"),
+    ).toBe("Try again in 1 minute.");
+    expect(retryLater("Hourly inference limit reached")).toBe("Try later.");
+  });
 });

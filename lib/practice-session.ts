@@ -168,3 +168,28 @@ export function saveLocalSession(
     );
   return [...sessions.filter((s) => s.id !== next.id), next];
 }
+
+// Browser-mode attempts are kept per owner scope, like practice notes.
+// Attempts saved before scoping (one shared key) move to the browser
+// scope once, the first time it is read.
+const legacySessionsKey = "fieldwork-interviews-v1";
+export const localSessionsKey = (scope: string) =>
+  `${legacySessionsKey}-${scope}`;
+export function readLocalSessions(scope: string): unknown[] {
+  const key = localSessionsKey(scope);
+  let raw = localStorage.getItem(key);
+  if (raw === null && scope === "browser") {
+    const legacy = localStorage.getItem(legacySessionsKey);
+    if (legacy !== null) {
+      localStorage.setItem(key, legacy);
+      localStorage.removeItem(legacySessionsKey);
+      raw = legacy;
+    }
+  }
+  const parsed: unknown = JSON.parse(raw || "[]");
+  if (!Array.isArray(parsed)) throw new Error("Invalid saved practice data.");
+  return parsed;
+}
+export function writeLocalSessions(scope: string, sessions: unknown[]) {
+  localStorage.setItem(localSessionsKey(scope), JSON.stringify(sessions));
+}

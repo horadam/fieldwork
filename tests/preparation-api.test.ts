@@ -123,7 +123,9 @@ it("refuses a hosted generation over the hourly quota without a model call", asy
     db: {
       rpc: async () => ({
         data: null,
-        error: { message: "Hourly inference limit reached" },
+        error: {
+          message: "Hourly inference limit reached; retry in 12 minutes",
+        },
       }),
     },
   });
@@ -131,6 +133,7 @@ it("refuses a hosted generation over the hourly quota without a model call", asy
   mocks.loadSources.mockResolvedValue(workspace());
   const response = await generate(req({ targetId: target.id, settings }));
   expect(response.status).toBe(429);
+  expect((await response.json()).error).toContain("Try again in 12 minutes.");
   expect(mocks.generatePreparation).not.toHaveBeenCalled();
 });
 it("rejects invalid settings before loading sources or making a provider call", async () => {

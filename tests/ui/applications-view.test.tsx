@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { ApplicationsView } from "../../components/applications-view";
+import {
+  ApplicationsView,
+  fitLabel,
+  runMeta,
+} from "../../components/applications-view";
 import { demoAnalysis, type Run, type Workspace } from "../../lib/domain";
 import { seed } from "../../lib/seed";
 
@@ -64,8 +68,10 @@ describe("ApplicationsView", () => {
 
   it("analyzes the selected job and explains a disabled button", () => {
     const handlers = setup();
-    // The header and the empty Fit tab both offer it.
+    // Only the empty Fit tab offers it; the header shows status instead.
     const buttons = screen.getAllByRole("button", { name: "Analyze fit" });
+    expect(buttons).toHaveLength(1);
+    expect(screen.getAllByText("Not analyzed").length).toBeGreaterThan(0);
     fireEvent.click(buttons[0]);
     expect(handlers.onAnalyze).toHaveBeenCalledWith(job);
     cleanup();
@@ -85,17 +91,62 @@ describe("ApplicationsView", () => {
     expect(screen.queryByRole("button", { name: "Approve plan" })).toBeNull();
   });
 
-  it("offers to prepare when the job has no preparation plan", () => {
+  it("offers analysis, not preparation, before a current analysis exists", () => {
     const handlers = setup();
     fireEvent.click(screen.getByRole("tab", { name: "Prep plan" }));
     expect(screen.getByText("No preparation plan yet")).toBeTruthy();
     expect(document.body.textContent).toContain(
-      "It needs a completed real analysis first.",
+      "Run a current real analysis first.",
     );
+    expect(
+      screen.queryByRole("button", { name: "Prepare for this job" }),
+    ).toBeNull();
+    const buttons = screen.getAllByRole("button", { name: "Analyze fit" });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    expect(handlers.onAnalyze).toHaveBeenCalledWith(job);
+  });
+
+  it("offers to prepare once a current analysis exists", () => {
+    const run = completedRun();
+    run.jd_snapshot = job.jd;
+    const handlers = setup({ workspace: workspace([run]) });
+    fireEvent.click(screen.getByRole("tab", { name: "Prep plan" }));
     fireEvent.click(
       screen.getByRole("button", { name: "Prepare for this job" }),
     );
     expect(handlers.onPrepare).toHaveBeenCalledWith(job);
+  });
+
+  it("explains why a changed experience bank needs a new analysis", () => {
+    const run = completedRun();
+    run.jd_snapshot = job.jd;
+    const data = workspace([run]);
+    data.experience[0].body += " New experience";
+    setup({ workspace: data });
+    expect(
+      screen.getByText(/Your experience changed since this analysis/),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Re-run fit analysis" }),
+    ).toBeTruthy();
+  });
+
+  it("marks unanalyzed jobs with a chip and lists run facts separately", () => {
+    expect(fitLabel(undefined)).toBeNull();
+    const run = completedRun();
+    expect(runMeta(run)).toEqual([
+      "ollama",
+      "qwen3:8b",
+      expect.any(String),
+      "4.2 s",
+    ]);
+    expect(
+      runMeta({ ...run, provider: "simulated", model: "none" }).slice(0, 2),
+    ).toEqual(["Simulated preview", "no model called"]);
+    setup();
+    const row = screen.getByRole("button", { pressed: true });
+    expect(row.querySelector(".chip")?.textContent).toBe("Not analyzed");
   });
 
   it("shows the job's preparation plan and opens it", () => {

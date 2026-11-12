@@ -180,7 +180,7 @@ describe("Preparing for…", () => {
     );
     await waitFor(() =>
       expect(
-        JSON.parse(localStorage.getItem("fieldwork-interviews-v1")!),
+        JSON.parse(localStorage.getItem("fieldwork-interviews-v1-browser")!),
       ).toEqual([{ planId: "another-plan" }]),
     );
   });

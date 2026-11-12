@@ -13,6 +13,7 @@ import { OverflowMenu } from "./ui/overflow-menu";
 import { TimingFields } from "./preparation/timing-fields";
 import { DraftReview } from "./preparation/draft-review";
 import { InterviewSession } from "./preparation/interview-session";
+import { readLocalSessions, writeLocalSessions } from "@/lib/practice-session";
 import { PlanPractice } from "./preparation/plan-practice";
 import { EarlierTasks, PlanSchedule } from "./preparation/plan-views";
 import type { Job, Workspace } from "@/lib/domain";
@@ -498,16 +499,18 @@ export function PreparationWorkspace(props: Props) {
           { id: target.id },
         );
         if (!token) {
-          const raw = JSON.parse(
-            localStorage.getItem("fieldwork-interviews-v1") || "[]",
-          );
-          if (Array.isArray(raw)) {
-            localStorage.setItem(
-              "fieldwork-interviews-v1",
-              JSON.stringify(
-                raw.filter((session) => !deletedPlanIds.has(session.planId)),
+          try {
+            writeLocalSessions(
+              scope,
+              readLocalSessions(scope).filter(
+                (session) =>
+                  !deletedPlanIds.has(
+                    String((session as { planId?: unknown }).planId),
+                  ),
               ),
             );
+          } catch {
+            /* Unreadable attempts are left for the interview view to report. */
           }
         }
         // A role stays selected, ready for a new plan; a deleted group is gone.
@@ -712,6 +715,12 @@ export function PreparationWorkspace(props: Props) {
             )}
             {problems.map((problem) => (
               <div className="notice" key={problem.jobId}>
+                {/* The heading names a single role; a group needs each name. */}
+                {problem.label && target && target.jobIds.length > 1 && (
+                  <p>
+                    <strong>{problem.label}</strong>
+                  </p>
+                )}
                 <p>{problem.message}</p>
                 {workspace.jobs.find((j) => j.id === problem.jobId) && (
                   <button
@@ -801,6 +810,7 @@ export function PreparationWorkspace(props: Props) {
                     key={`${props.scope}:${plan.id}`}
                     plan={plan}
                     token={token}
+                    scope={props.scope}
                     ai={props.ai}
                     questionIds={
                       practiceSelection?.ids || [
