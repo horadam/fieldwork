@@ -77,6 +77,9 @@ sequenceDiagram
 - Account reservation enforces ten analysis starts/hour and one active run per
   application. Migration 002 expires stale active runs after five minutes on a
   later reservation attempt. Quota history survives application deletion.
+- A browser analysis that finishes after sign-in or sign-out is dropped, so
+  it never writes the other workspace into browser storage. Its record stays
+  running until the next browser load marks it interrupted.
 - On browser reload, interrupted running/pending records become failed. A failed
   database completion/status write can leave an account run active until stale-run
   recovery; the error guidance describes this rather than claiming success.

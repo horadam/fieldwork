@@ -29,7 +29,12 @@ flowchart LR
   failed write leaves the form open for retry. A running browser analysis
   persists its progress through `update()`.
 - **Stale sessions are ignored.** A result that arrives after sign-in or sign-out
-  is dropped rather than shown in the other workspace.
+  is dropped rather than shown in the other workspace. This includes a browser
+  analysis, which would otherwise save the account workspace into browser
+  storage; its run shows as interrupted on the next browser load.
+- **Late code reads the latest data.** `commit()` writes a ref alongside React
+  state, so work that continues after an `await` (analysis patches, a task
+  rollback) starts from the newest workspace, not the render it began in.
 - **Checkboxes update at once.** A task shows its new state immediately and saves
   in the background. If the save fails, only that task reverts, and only its own
   checkbox is disabled meanwhile.

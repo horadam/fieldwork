@@ -30,6 +30,7 @@ Non-obvious things this project has taught its contributors, human or agent. Rea
 
 - **Tailwind's base styles strip list markers.** `ul`/`ol` render without bullets or numbers unless a class sets `list-style` again; `.bullets` does. (2026-11-06)
 - **The spacing flow rule only covers listed containers.** A new container that holds stacked content (a `fieldset`, a task body) needs adding to the `* + *` rule in `app/globals.css`, or its children touch. (2026-11-06)
+- **A closure from before an `await` keeps that render's `store` and `mode`, not just its `data`.** `dataRef` fixes stale data, but a browser analysis that finished after sign-in still saved through the old browser store and wrote the account workspace to localStorage. Writes after an `await` must check the session owner, as `apply()` and the analysis patches in `components/hooks/use-workspace-data.ts` do. (2026-11-13)
 
 ## Model calls
 

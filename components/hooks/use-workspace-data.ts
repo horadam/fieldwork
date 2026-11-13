@@ -53,6 +53,8 @@ export function useWorkspaceData() {
     [mode, request],
   );
   // The latest data, so chained operations never start from a stale render.
+  // Needed by code that runs after an await or twice in one tick: the
+  // analysis patches and the task rollback.
   const dataRef = useRef(data);
   function commit(next: Data) {
     dataRef.current = next;
@@ -195,13 +197,20 @@ export function useWorkspaceData() {
         evidence_snapshot: structuredClone(dataRef.current.experience),
       };
       const analysisStartedAt = Date.now();
-      const patchAnalysisRun = (changes: Partial<AnalysisRun>) =>
+      // This closure keeps the browser store from the click. If the session
+      // changed meanwhile, writing through it would put the account workspace
+      // into localStorage; drop the result instead, and the next browser load
+      // marks the run interrupted.
+      const owner = activeToken.current;
+      const patchAnalysisRun = (changes: Partial<AnalysisRun>) => {
+        if (activeToken.current !== owner) return;
         update((old) => ({
           ...old,
           runs: old.runs.map((r) =>
             r.id === analysisRun.id ? { ...r, ...changes } : r,
           ),
         }));
+      };
       update((old) => ({ ...old, runs: [analysisRun, ...old.runs] }));
       setSelectedAnalysisRunId(analysisRun.id);
       try {
