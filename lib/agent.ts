@@ -90,7 +90,10 @@ export async function analyze(
         : {}),
     },
   });
-  const runner = new Runner({ tracingDisabled: true }); // Resume/JD content stays out of hosted trace storage.
+  const runner = new Runner({
+    tracingDisabled: false,
+    traceIncludeSensitiveData: false,
+  });
   const deadline = AbortSignal.timeout(config.deadlineMs);
   const combined = signal ? AbortSignal.any([deadline, signal]) : deadline;
   const started = Date.now();
