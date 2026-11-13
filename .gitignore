@@ -20,3 +20,8 @@ Open Workspace.command
 .npmrc
 docs/handoff-*.md
 VERIFICATION.md
+
+# Local review and study-plan docs (personal, not for the public repo)
+docs/review/
+docs/study-plan/
+docs/prompts/study-plan-prompt.md

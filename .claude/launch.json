@@ -20,6 +20,17 @@
       ],
       "port": 3100,
       "url": "http://127.0.0.1:3100"
+    },
+    {
+      "name": "portfolio",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "../portfolio",
+        "dev"
+      ],
+      "port": 3200,
+      "url": "http://127.0.0.1:3200"
     }
   ]
 }
