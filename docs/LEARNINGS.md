@@ -24,12 +24,14 @@ Non-obvious things this project has taught its contributors, human or agent. Rea
 - **Use "Add user", not "Invite user".** Invite sends a magic link, and the app has no set-password screen, so invited people can't sign in with a password later. (2026-11-05)
 - **`NEXT_PUBLIC_SIGNUPS=closed` only hides the button.** Supabase's "Allow new users to sign up" switch is what enforces invite-only. (2026-11-05)
 - **Create the browser Supabase client once per page.** React runs effects twice in development, and Fast Refresh remounts components, so `createClient` inside an effect makes several clients on the same session ("Multiple GoTrueClient instances"). Use `browserSupabase()` in `lib/supabase-browser.ts`. (2026-11-05)
+- **`onAuthStateChange` fires on every token refresh (`TOKEN_REFRESHED`), with a new access token.** Keying reloads or "same session?" checks on the token blanked the workspace about hourly and dropped in-flight saves. Key them on `session.user.id` and keep the token only for requests (`components/hooks/use-workspace-data.ts`). (2026-11-13)
 - **The built-in mailer is for testing.** It sends a handful of emails per hour, only to members of the Supabase organization, so open sign-up on a public site needs custom SMTP. (2026-11-05)
 
 ## UI and CSS
 
 - **Tailwind's base styles strip list markers.** `ul`/`ol` render without bullets or numbers unless a class sets `list-style` again; `.bullets` does. (2026-11-06)
 - **The spacing flow rule only covers listed containers.** A new container that holds stacked content (a `fieldset`, a task body) needs adding to the `* + *` rule in `app/globals.css`, or its children touch. (2026-11-06)
+- **A closure from before an `await` keeps that render's `store` and `mode`, not just its `data`.** `dataRef` fixes stale data, but a browser analysis that finished after sign-in still saved through the old browser store and wrote the account workspace to localStorage. Writes after an `await` must check the session owner, as `apply()` and the analysis patches in `components/hooks/use-workspace-data.ts` do. (2026-11-13)
 
 ## Model calls
 
