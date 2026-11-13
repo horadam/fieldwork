@@ -36,24 +36,26 @@ type Modal =
   | { type: "openai-key" }
   | { type: "delete"; entity: Entity; id: string };
 
-const modalTitle = (modal: Modal) =>
-  modal.type === "job-import"
-    ? "Import job from URL"
-    : modal.type === "resume-import"
-      ? "Import resume"
-      : modal.type === "auth"
-        ? "Your private workspace"
-        : modal.type === "openai-key"
-          ? "Your OpenAI key"
-          : modal.type === "delete"
-            ? "Delete this record?"
-            : modal.form.entity === "job"
-              ? modal.form.value
-                ? "Edit application"
-                : "Add application"
-              : modal.form.value
-                ? "Edit experience"
-                : "Add user-confirmed experience";
+function modalTitle(modal: Modal): string {
+  switch (modal.type) {
+    case "job-import":
+      return "Import job from URL";
+    case "resume-import":
+      return "Import resume";
+    case "auth":
+      return "Your private workspace";
+    case "openai-key":
+      return "Your OpenAI key";
+    case "delete":
+      return "Delete this record?";
+    case "record":
+      if (modal.form.entity === "job")
+        return modal.form.value ? "Edit application" : "Add application";
+      return modal.form.value
+        ? "Edit experience"
+        : "Add user-confirmed experience";
+  }
+}
 
 export default function Workspace() {
   const ws = useWorkspaceData();
