@@ -32,6 +32,9 @@ flowchart LR
   is dropped rather than shown in the other workspace. This includes a browser
   analysis, which would otherwise save the account workspace into browser
   storage; its run shows as interrupted on the next browser load.
+  A session belongs to the signed-in user, not the access token: Supabase's
+  token refresh keeps the workspace on screen and lets in-flight saves land,
+  while requests send the latest token.
 - **Late code reads the latest data.** `commit()` writes a ref alongside React
   state, so work that continues after an `await` (analysis patches, a task
   rollback) starts from the newest workspace, not the render it began in.

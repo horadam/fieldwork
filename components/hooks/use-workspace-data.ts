@@ -34,8 +34,13 @@ export function useWorkspaceData() {
   const [data, setData] = useState<Data>(seed);
   const [mode, setMode] = useState<"demo" | "live">("demo");
   const [client, setClient] = useState<SupabaseClient | null>(null);
+  // The access token changes on every refresh; the user changes only on
+  // sign-in, sign-out or switching account. Requests use the latest token,
+  // while reloads and ownership checks follow the user.
   const [token, setToken] = useState("");
   const activeToken = useRef("");
+  const [userId, setUserId] = useState("");
+  const activeUser = useRef("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -60,11 +65,11 @@ export function useWorkspaceData() {
     dataRef.current = next;
     setData(next);
   }
-  // Applies a store result only if the same session is still active.
+  // Applies a store result only if the same user is still signed in.
   async function apply(result: Promise<Data>) {
-    const owner = activeToken.current;
+    const owner = activeUser.current;
     const next = await result;
-    if (activeToken.current === owner) commit(next);
+    if (activeUser.current === owner) commit(next);
   }
   // In-progress changes, such as a running browser analysis.
   function update(change: (old: Data) => Data) {
@@ -95,7 +100,9 @@ export function useWorkspaceData() {
     setClient(db);
     const { data: listener } = db.auth.onAuthStateChange((_event, session) => {
       activeToken.current = session?.access_token || "";
+      activeUser.current = session?.user.id || "";
       setToken(session?.access_token || "");
+      setUserId(session?.user.id || "");
       setEmail(session?.user.email || "");
       setMode(session ? "live" : "demo");
       if (!session)
@@ -104,10 +111,10 @@ export function useWorkspaceData() {
     return () => listener.subscription.unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!token) return;
+    if (!userId) return;
     commit(empty);
     apply(accountStore(request).load()).catch((e) => setError(e.message));
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Runs one shell-level action with the shared busy and error state.
   async function act(work: () => Promise<void>) {
@@ -201,9 +208,9 @@ export function useWorkspaceData() {
       // changed meanwhile, writing through it would put the account workspace
       // into localStorage; drop the result instead, and the next browser load
       // marks the run interrupted.
-      const owner = activeToken.current;
+      const owner = activeUser.current;
       const patchAnalysisRun = (changes: Partial<AnalysisRun>) => {
-        if (activeToken.current !== owner) return;
+        if (activeUser.current !== owner) return;
         update((old) => ({
           ...old,
           runs: old.runs.map((r) =>
