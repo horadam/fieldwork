@@ -1062,17 +1062,17 @@ footer {
 .empty.slim {
   padding: 32px 24px;
 }
-.run-meta {
+.analysis-run-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   justify-content: space-between;
   align-items: center;
 }
-.run-meta p {
+.analysis-run-meta p {
   margin: 0;
 }
-.run-meta select {
+.analysis-run-meta select {
   margin-left: 6px;
   padding: 4px 6px;
   border: 1px solid var(--line);

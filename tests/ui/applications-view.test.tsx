@@ -3,18 +3,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
   ApplicationsView,
+  analysisRunMeta,
   fitLabel,
-  runMeta,
 } from "../../components/applications-view";
-import { demoAnalysis, type Run, type Workspace } from "../../lib/domain";
+import {
+  demoAnalysis,
+  type AnalysisRun,
+  type Workspace,
+} from "../../lib/domain";
 import { seed } from "../../lib/seed";
 
 afterEach(cleanup);
 const job = seed.jobs[0];
-function workspace(runs: Run[] = []): Workspace {
-  return { ...structuredClone(seed), runs };
+function workspace(analysisRuns: AnalysisRun[] = []): Workspace {
+  return { ...structuredClone(seed), runs: analysisRuns };
 }
-function completedRun(): Run {
+function completedAnalysisRun(): AnalysisRun {
   const output = demoAnalysis(job, seed.experience);
   output.requirements[0].status = "supported";
   output.requirements[0].evidenceIds = ["demo-e1"];
@@ -36,7 +40,7 @@ function setup(
   overrides: Partial<Parameters<typeof ApplicationsView>[0]> = {},
 ) {
   const handlers = {
-    onSelectRun: vi.fn(),
+    onSelectAnalysisRun: vi.fn(),
     onAnalyze: vi.fn(),
     onPrepare: vi.fn(),
     onEdit: vi.fn(),
@@ -50,8 +54,8 @@ function setup(
       mode="demo"
       busy={false}
       aiReady
-      runningJob={null}
-      selectedRun={null}
+      analyzingJobId={null}
+      selectedAnalysisRunId={null}
       {...handlers}
       {...overrides}
     />,
@@ -83,9 +87,12 @@ describe("ApplicationsView", () => {
     expect(screen.getByText(/model/i, { selector: "p" })).toBeTruthy();
   });
 
-  it("shows coverage for a real run, with no approval step", () => {
-    const run = completedRun();
-    setup({ workspace: workspace([run]), selectedRun: run.id });
+  it("shows coverage for a real analysis, with no approval step", () => {
+    const analysisRun = completedAnalysisRun();
+    setup({
+      workspace: workspace([analysisRun]),
+      selectedAnalysisRunId: analysisRun.id,
+    });
     expect(screen.getByText("requirements fully met")).toBeTruthy();
     expect(screen.getAllByText("Met").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Approve plan" })).toBeNull();
@@ -108,9 +115,9 @@ describe("ApplicationsView", () => {
   });
 
   it("offers to prepare once a current analysis exists", () => {
-    const run = completedRun();
-    run.jd_snapshot = job.jd;
-    const handlers = setup({ workspace: workspace([run]) });
+    const analysisRun = completedAnalysisRun();
+    analysisRun.jd_snapshot = job.jd;
+    const handlers = setup({ workspace: workspace([analysisRun]) });
     fireEvent.click(screen.getByRole("tab", { name: "Prep plan" }));
     fireEvent.click(
       screen.getByRole("button", { name: "Prepare for this job" }),
@@ -119,9 +126,9 @@ describe("ApplicationsView", () => {
   });
 
   it("explains why a changed experience bank needs a new analysis", () => {
-    const run = completedRun();
-    run.jd_snapshot = job.jd;
-    const data = workspace([run]);
+    const analysisRun = completedAnalysisRun();
+    analysisRun.jd_snapshot = job.jd;
+    const data = workspace([analysisRun]);
     data.experience[0].body += " New experience";
     setup({ workspace: data });
     expect(
@@ -132,17 +139,21 @@ describe("ApplicationsView", () => {
     ).toBeTruthy();
   });
 
-  it("marks unanalyzed jobs with a chip and lists run facts separately", () => {
+  it("marks unanalyzed jobs with a chip and lists analysis facts separately", () => {
     expect(fitLabel(undefined)).toBeNull();
-    const run = completedRun();
-    expect(runMeta(run)).toEqual([
+    const analysisRun = completedAnalysisRun();
+    expect(analysisRunMeta(analysisRun)).toEqual([
       "ollama",
       "qwen3:8b",
       expect.any(String),
       "4.2 s",
     ]);
     expect(
-      runMeta({ ...run, provider: "simulated", model: "none" }).slice(0, 2),
+      analysisRunMeta({
+        ...analysisRun,
+        provider: "simulated",
+        model: "none",
+      }).slice(0, 2),
     ).toEqual(["Simulated preview", "no model called"]);
     setup();
     const row = screen.getByRole("button", { pressed: true });
@@ -220,9 +231,9 @@ describe("ApplicationsView", () => {
 });
 
 it("advances a fresh analysis to plan creation", () => {
-  const run = completedRun();
-  run.jd_snapshot = job.jd;
-  const handlers = setup({ workspace: workspace([run]) });
+  const analysisRun = completedAnalysisRun();
+  analysisRun.jd_snapshot = job.jd;
+  const handlers = setup({ workspace: workspace([analysisRun]) });
   fireEvent.click(
     screen.getByRole("button", { name: "Create preparation plan" }),
   );

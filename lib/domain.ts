@@ -65,7 +65,7 @@ export type Experience = z.infer<typeof experienceInput> & {
   import_item_id?: string;
 };
 export type Job = z.infer<typeof jobInput> & { id: string };
-export type Run = {
+export type AnalysisRun = {
   id: string;
   application_id: string;
   status: "pending" | "running" | "completed" | "failed";
@@ -91,7 +91,8 @@ export type Task = {
 export type Workspace = {
   jobs: Job[];
   experience: Experience[];
-  runs: Run[];
+  // `runs` is the existing workspace storage/API key; entries are fit analyses.
+  runs: AnalysisRun[];
   tasks: Task[];
 };
 

@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       if (saved.error)
         throw new HttpError(
           500,
-          "Could not save run status. A stale run expires on your next attempt after five minutes.",
+          "Could not save analysis status. A stale analysis expires on your next attempt after five minutes.",
         );
       throw diagnostic;
     }
@@ -82,11 +82,11 @@ export async function POST(req: NextRequest) {
     if (saved.error)
       throw new HttpError(
         500,
-        "The analysis finished but could not be saved. Retry after five minutes, when the stale run expires.",
+        "The analysis finished but could not be saved. Retry after five minutes, when the stale analysis expires.",
       );
     return NextResponse.json({
       ok: true,
-      runId: record.id,
+      analysisRunId: record.id,
       usage: {
         provider: config.provider,
         model: config.model,

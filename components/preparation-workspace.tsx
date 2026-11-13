@@ -22,7 +22,7 @@ import {
   defaultSettings,
   emptyPreparation,
   emptyProgress,
-  matchingRun,
+  matchingAnalysisRun,
   outdated,
   planSummaries,
   schedulePlan,
@@ -424,7 +424,7 @@ export function PreparationWorkspace(props: Props) {
                       saved.jobIds.includes(job.id),
                     ),
                     runs: saved.jobIds
-                      .map((id) => matchingRun(id, workspace))
+                      .map((id) => matchingAnalysisRun(id, workspace))
                       .filter(Boolean),
                     experience: workspace.experience,
                     tasks: [],

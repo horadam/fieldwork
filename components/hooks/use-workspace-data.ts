@@ -4,8 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   demoAnalysis,
   jobInput,
+  type AnalysisRun,
   type Job,
-  type Run,
   type Workspace as Data,
 } from "@/lib/domain";
 import type { ImportBatch } from "@/lib/resume";
@@ -39,8 +39,10 @@ export function useWorkspaceData() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [runningJob, setRunningJob] = useState<string | null>(null);
-  const [selectedRun, setSelectedRun] = useState<string | null>(null);
+  const [analyzingJobId, setAnalyzingJobId] = useState<string | null>(null);
+  const [selectedAnalysisRunId, setSelectedAnalysisRunId] = useState<
+    string | null
+  >(null);
 
   const request = useMemo(() => apiClient(() => activeToken.current), []);
   const store = useMemo(
@@ -150,21 +152,26 @@ export function useWorkspaceData() {
     }
   }
 
-  async function runJob(job: Job, ai: AiStatus | null, simulated = false) {
-    setRunningJob(job.id);
+  async function runFitAnalysis(
+    job: Job,
+    ai: AiStatus | null,
+    simulated = false,
+  ) {
+    setAnalyzingJobId(job.id);
     await act(async () => {
       if (mode === "live") {
         try {
-          const result = await request<{ runId: string }>("/api/analyze", {
-            body: { applicationId: job.id },
-          });
+          const result = await request<{ analysisRunId: string }>(
+            "/api/analyze",
+            { body: { applicationId: job.id } },
+          );
           await apply(store.load());
-          setSelectedRun(result.runId);
+          setSelectedAnalysisRunId(result.analysisRunId);
         } catch (e) {
           await apply(store.load());
           throw e;
         } finally {
-          setRunningJob(null);
+          setAnalyzingJobId(null);
         }
         return;
       }
@@ -172,7 +179,7 @@ export function useWorkspaceData() {
         throw new Error(
           "Model status is unknown. Refresh model status and try again.",
         );
-      const run: Run = {
+      const analysisRun: AnalysisRun = {
         id: crypto.randomUUID(),
         application_id: job.id,
         status: "running",
@@ -187,35 +194,35 @@ export function useWorkspaceData() {
         jd_snapshot: job.jd,
         evidence_snapshot: structuredClone(dataRef.current.experience),
       };
-      const runStarted = Date.now();
-      const patch = (changes: Partial<Run>) =>
+      const analysisStartedAt = Date.now();
+      const patchAnalysisRun = (changes: Partial<AnalysisRun>) =>
         update((old) => ({
           ...old,
           runs: old.runs.map((r) =>
-            r.id === run.id ? { ...r, ...changes } : r,
+            r.id === analysisRun.id ? { ...r, ...changes } : r,
           ),
         }));
-      update((old) => ({ ...old, runs: [run, ...old.runs] }));
-      setSelectedRun(run.id);
+      update((old) => ({ ...old, runs: [analysisRun, ...old.runs] }));
+      setSelectedAnalysisRunId(analysisRun.id);
       try {
         if (simulated)
-          patch({
+          patchAnalysisRun({
             status: "completed",
-            output: demoAnalysis(job, run.evidence_snapshot!),
+            output: demoAnalysis(job, analysisRun.evidence_snapshot!),
           });
         else {
           const result = await request<{
-            output: Run["output"];
-            provider: Run["provider"];
+            output: AnalysisRun["output"];
+            provider: AnalysisRun["provider"];
             model: string;
             promptVersion: string;
             durationMs: number;
             inputTokens: number;
             outputTokens: number;
           }>("/api/analyze/local", {
-            body: { jd: job.jd, experience: run.evidence_snapshot },
+            body: { jd: job.jd, experience: analysisRun.evidence_snapshot },
           });
-          patch({
+          patchAnalysisRun({
             status: "completed",
             output: result.output,
             model: result.model,
@@ -227,14 +234,14 @@ export function useWorkspaceData() {
           });
         }
       } catch (e) {
-        patch({
+        patchAnalysisRun({
           status: "failed",
           error: message(e, "Analysis failed"),
-          duration_ms: Date.now() - runStarted,
+          duration_ms: Date.now() - analysisStartedAt,
         });
         throw e;
       } finally {
-        setRunningJob(null);
+        setAnalyzingJobId(null);
       }
     });
   }
@@ -285,7 +292,7 @@ export function useWorkspaceData() {
   const signOut = () =>
     act(async () => {
       await client?.auth.signOut();
-      setSelectedRun(null);
+      setSelectedAnalysisRunId(null);
     });
 
   return {
@@ -298,15 +305,15 @@ export function useWorkspaceData() {
     busy,
     error,
     setError,
-    runningJob,
-    selectedRun,
-    setSelectedRun,
+    analyzingJobId,
+    selectedAnalysisRunId,
+    setSelectedAnalysisRunId,
     savingTask,
     saveRecord,
     removeRecord,
     importExperience,
     importJob,
-    runJob,
+    runFitAnalysis,
     toggleTask,
     authenticate,
     signOut,

@@ -6,13 +6,13 @@ import {
   fitCoverage,
   type Analysis,
   type Job,
-  type Run,
+  type AnalysisRun,
   type Workspace as Data,
 } from "@/lib/domain";
 import { usageParts } from "@/lib/pricing";
 import {
   analysisProblem,
-  matchingRun,
+  matchingAnalysisRun,
   type PlanSummary,
 } from "@/lib/preparation-plan";
 import { signupsOpen } from "@/lib/deployment";
@@ -32,37 +32,44 @@ const statusLabel = {
   unsupported: "Gap",
 } as const;
 
-const isSimulated = (run: Run) =>
-  run.provider === "simulated" || run.model === "none";
+const isSimulated = (analysisRun: AnalysisRun) =>
+  analysisRun.provider === "simulated" || analysisRun.model === "none";
 
 // Short fit summary for a list row; null when the job has no analysis yet.
-export function fitLabel(run: Run | undefined) {
-  if (!run?.output) return null;
-  if (isSimulated(run)) return "Preview";
-  const c = fitCoverage(run.output);
+export function fitLabel(analysisRun: AnalysisRun | undefined) {
+  if (!analysisRun?.output) return null;
+  if (isSimulated(analysisRun)) return "Preview";
+  const c = fitCoverage(analysisRun.output);
   return `${c.supported}/${c.total}`;
 }
 
-// The facts about one run, rendered as a Meta row.
-export function runMeta(run: Run): string[] {
-  const when = dateTime(run.created_at);
-  if (isSimulated(run)) return ["Simulated preview", "no model called", when];
+// The facts about one analysis run, rendered as a Meta row.
+export function analysisRunMeta(analysisRun: AnalysisRun): string[] {
+  const when = dateTime(analysisRun.created_at);
+  if (isSimulated(analysisRun))
+    return ["Simulated preview", "no model called", when];
   const duration =
-    run.status === "running" || run.status === "pending"
+    analysisRun.status === "running" || analysisRun.status === "pending"
       ? "in progress"
-      : run.duration_ms && run.duration_ms > 0
-        ? `${(run.duration_ms / 1000).toFixed(1)} s`
+      : analysisRun.duration_ms && analysisRun.duration_ms > 0
+        ? `${(analysisRun.duration_ms / 1000).toFixed(1)} s`
         : "duration not recorded";
   const usage =
-    run.input_tokens || run.output_tokens
+    analysisRun.input_tokens || analysisRun.output_tokens
       ? usageParts({
-          provider: run.provider || "openai",
-          model: run.model,
-          inputTokens: run.input_tokens || 0,
-          outputTokens: run.output_tokens || 0,
+          provider: analysisRun.provider || "openai",
+          model: analysisRun.model,
+          inputTokens: analysisRun.input_tokens || 0,
+          outputTokens: analysisRun.output_tokens || 0,
         })
       : [];
-  return [run.provider || "openai", run.model, when, duration, ...usage];
+  return [
+    analysisRun.provider || "openai",
+    analysisRun.model,
+    when,
+    duration,
+    ...usage,
+  ];
 }
 
 const statusChip = (label: string) => (
@@ -76,9 +83,9 @@ export function ApplicationsView({
   busy,
   aiReady,
   ai,
-  runningJob,
-  selectedRun,
-  onSelectRun,
+  analyzingJobId,
+  selectedAnalysisRunId,
+  onSelectAnalysisRun,
   onAnalyze,
   onPrepare,
   onEdit,
@@ -92,9 +99,9 @@ export function ApplicationsView({
   busy: boolean;
   aiReady: boolean;
   ai?: AiStatus | null;
-  runningJob: string | null;
-  selectedRun: string | null;
-  onSelectRun: (id: string | null) => void;
+  analyzingJobId: string | null;
+  selectedAnalysisRunId: string | null;
+  onSelectAnalysisRun: (id: string | null) => void;
   onAnalyze: (job: Job, simulated?: boolean) => void;
   onPrepare: (job: Job) => void;
   onEdit: (job: Job) => void;
@@ -109,23 +116,26 @@ export function ApplicationsView({
   const [jobId, setJobId] = useState<string | null>(null);
   const [section, setSection] = useState<Section>("fit");
 
-  // A newly started or explicitly opened run should be visible immediately.
+  // A newly started or explicitly opened analysis should be visible immediately.
   useEffect(() => {
-    if (selectedRun) setSection("fit");
-  }, [selectedRun]);
+    if (selectedAnalysisRunId) setSection("fit");
+  }, [selectedAnalysisRunId]);
 
-  const runsFor = (id: string) =>
+  const analysisRunsFor = (id: string) =>
     workspace.runs
       .filter((r) => r.application_id === id)
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const latestOutput = (id: string) => runsFor(id).find((r) => r.output);
+  const latestOutput = (id: string) =>
+    analysisRunsFor(id).find((analysisRun) => analysisRun.output);
 
   const jobs = workspace.jobs.filter((j) =>
     `${j.company} ${j.role}`.toLowerCase().includes(search.toLowerCase()),
   );
-  const pinned = workspace.runs.find((r) => r.id === selectedRun);
+  const selectedAnalysisRun = workspace.runs.find(
+    (analysisRun) => analysisRun.id === selectedAnalysisRunId,
+  );
   const job =
-    workspace.jobs.find((j) => j.id === pinned?.application_id) ||
+    workspace.jobs.find((j) => j.id === selectedAnalysisRun?.application_id) ||
     workspace.jobs.find((j) => j.id === jobId) ||
     jobs[0];
 
@@ -142,13 +152,16 @@ export function ApplicationsView({
       </div>
     );
 
-  const runs = job ? runsFor(job.id) : [];
-  const run = pinned?.application_id === job?.id ? pinned : runs[0];
-  const running = !!job && runningJob === job.id;
+  const analysisRuns = job ? analysisRunsFor(job.id) : [];
+  const analysisRun =
+    selectedAnalysisRun?.application_id === job?.id
+      ? selectedAnalysisRun
+      : analysisRuns[0];
+  const analysisInProgress = !!job && analyzingJobId === job.id;
 
   function selectJob(id: string) {
     setJobId(id);
-    onSelectRun(null);
+    onSelectAnalysisRun(null);
   }
 
   const analyzeButton = job && (
@@ -158,9 +171,9 @@ export function ApplicationsView({
       title={aiReady ? undefined : "The configured model is not available"}
       onClick={() => onAnalyze(job)}
     >
-      {running
+      {analysisInProgress
         ? "Analyzing…"
-        : runs.some((r) => !isSimulated(r))
+        : analysisRuns.some((analysisRun) => !isSimulated(analysisRun))
           ? "Re-run fit analysis"
           : "Analyze fit"}
     </button>
@@ -169,12 +182,17 @@ export function ApplicationsView({
   const activePrep = preparation.find(
     (p) => p.jobIds.includes(job?.id ?? "") && p.plan,
   );
-  const fresh = job && matchingRun(job.id, workspace);
-  // A completed real run that no longer matches the JD or experience bank.
+  const fresh = job && matchingAnalysisRun(job.id, workspace);
+  // A completed real analysis that no longer matches the JD or experience bank.
   const stale =
     !!job &&
     !fresh &&
-    runs.some((r) => r.status === "completed" && r.output && !isSimulated(r));
+    analysisRuns.some(
+      (analysisRun) =>
+        analysisRun.status === "completed" &&
+        analysisRun.output &&
+        !isSimulated(analysisRun),
+    );
   const jobPlans = job
     ? preparation.filter((t) => t.jobIds.includes(job.id))
     : [];
@@ -182,7 +200,7 @@ export function ApplicationsView({
   // explanation, so the header shows status instead of a second button.
   const emptyCarriesAction =
     !activePrep &&
-    ((section === "fit" && !run) ||
+    ((section === "fit" && !analysisRun) ||
       (section === "plan" && !jobPlans.length && !fresh));
   const nextAction =
     job &&
@@ -233,7 +251,7 @@ export function ApplicationsView({
               <span className="badge">{j.stage}</span>
               <span className="apps-row-company">{j.company}</span>
               <span className="apps-row-fit">
-                {runningJob === j.id
+                {analyzingJobId === j.id
                   ? "…"
                   : (fitLabel(latestOutput(j.id)) ?? notAnalyzed)}
               </span>
@@ -327,7 +345,7 @@ export function ApplicationsView({
           <div {...tabPanelProps("apps", section)} className="apps-panel">
             {section === "jd" && <p className="jd-text">{job.jd}</p>}
 
-            {section === "fit" && !run && (
+            {section === "fit" && !analysisRun && (
               <div className="empty slim">
                 <h3>No fit analysis yet.</h3>
                 <p className="tiny muted">
@@ -338,39 +356,49 @@ export function ApplicationsView({
               </div>
             )}
 
-            {section === "fit" && run && (
+            {section === "fit" && analysisRun && (
               <>
-                <div className="run-meta">
-                  <Meta items={runMeta(run)} />
-                  {runs.length > 1 && (
+                <div className="analysis-run-meta">
+                  <Meta items={analysisRunMeta(analysisRun)} />
+                  {analysisRuns.length > 1 && (
                     <label className="tiny muted">
-                      Run{" "}
+                      Analysis run{" "}
                       <select
-                        value={run.id}
-                        onChange={(e) => onSelectRun(e.target.value)}
+                        value={analysisRun.id}
+                        onChange={(e) =>
+                          onSelectAnalysisRun(e.target.value || null)
+                        }
                       >
-                        {runs.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {dateTime(r.created_at)} ·{" "}
-                            {isSimulated(r) ? "simulated" : r.status}
+                        {analysisRuns.map((candidate) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            {dateTime(candidate.created_at)} ·{" "}
+                            {isSimulated(candidate)
+                              ? "simulated"
+                              : candidate.status}
                           </option>
                         ))}
                       </select>
                     </label>
                   )}
                 </div>
-                {(run.status === "running" || run.status === "pending") && (
+                {(analysisRun.status === "running" ||
+                  analysisRun.status === "pending") && (
                   <p role="status" className="notice">
                     Analysis running. You can review other applications while
                     you wait.
                   </p>
                 )}
-                {run.error && (
+                {analysisRun.error && (
                   <p role="alert" className="notice error">
-                    {run.error}
+                    {analysisRun.error}
                   </p>
                 )}
-                {run.output && <FitResult run={run} output={run.output} />}
+                {analysisRun.output && (
+                  <FitResult
+                    analysisRun={analysisRun}
+                    output={analysisRun.output}
+                  />
+                )}
               </>
             )}
 
@@ -463,10 +491,16 @@ function PrepPlan({
   );
 }
 
-function FitResult({ run, output }: { run: Run; output: Analysis }) {
-  const simulated = isSimulated(run);
+function FitResult({
+  analysisRun,
+  output,
+}: {
+  analysisRun: AnalysisRun;
+  output: Analysis;
+}) {
+  const simulated = isSimulated(analysisRun);
   const coverage = fitCoverage(output);
-  const evidence = run.evidence_snapshot || [];
+  const evidence = analysisRun.evidence_snapshot || [];
   return (
     <>
       {simulated ? (

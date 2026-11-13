@@ -1,6 +1,6 @@
 "use client";
 import type { Workspace } from "@/lib/domain";
-import { matchingRun, type PlanSummary } from "@/lib/preparation-plan";
+import { matchingAnalysisRun, type PlanSummary } from "@/lib/preparation-plan";
 import { Meta } from "../ui/meta";
 import { overviewSteps } from "@/lib/sample-practice";
 import type { TabId } from "../shell/tabs";
@@ -22,7 +22,9 @@ export function OverviewView({
   studyTotal: number;
   onNavigate: (tab: TabId) => void;
 }) {
-  const analyzed = data.jobs.filter((j) => matchingRun(j.id, data)).length;
+  const analyzed = data.jobs.filter((j) =>
+    matchingAnalysisRun(j.id, data),
+  ).length;
   const activePlans = planSummaries.filter((s) => s.plan).length;
   return (
     <>

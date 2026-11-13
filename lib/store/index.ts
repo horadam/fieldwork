@@ -1,4 +1,4 @@
-import { type Experience, type Job, type Run, type Workspace } from "../domain";
+import { type Experience, type Job, type Workspace } from "../domain";
 import { importLocal, type ImportBatch } from "../resume";
 import { seed } from "../seed";
 import type { Request } from "../api-client";
@@ -76,7 +76,7 @@ export function browserStore(storage: () => Storage): WorkspaceStore {
       } catch {
         throw new Error("Saved browser data could not be loaded.");
       }
-      // A reload interrupts any browser-run analysis; never leave it spinning.
+      // A reload interrupts any browser analysis; never leave it spinning.
       restored.runs = restored.runs.map((r) =>
         r.status === "running" || r.status === "pending"
           ? {

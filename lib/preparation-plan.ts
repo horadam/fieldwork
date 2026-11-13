@@ -6,7 +6,7 @@ import {
   experienceInput,
   type Workspace,
   type Experience,
-  type Run,
+  type AnalysisRun,
 } from "./domain";
 
 const text = z.string().trim().min(1);
@@ -184,7 +184,10 @@ export const canonicalEvidence = (entries: Experience[]) =>
       .map(({ id, title, body }) => ({ id, title, body }))
       .sort((a, b) => a.id.localeCompare(b.id)),
   );
-export function matchingRun(jobId: string, data: Workspace): Run | undefined {
+export function matchingAnalysisRun(
+  jobId: string,
+  data: Workspace,
+): AnalysisRun | undefined {
   const job = data.jobs.find((j) => j.id === jobId);
   if (!job) return;
   return [...data.runs]
@@ -203,11 +206,11 @@ export function matchingRun(jobId: string, data: Workspace): Run | undefined {
     );
 }
 // Why a job has no current real analysis, in one sentence the Applications
-// and Study screens share; null when matchingRun finds one.
+// and Study screens share; null when matchingAnalysisRun finds one.
 export function analysisProblem(jobId: string, data: Workspace): string | null {
   const job = data.jobs.find((j) => j.id === jobId);
-  if (!job || matchingRun(jobId, data)) return null;
-  const latest = [...data.runs]
+  if (!job || matchingAnalysisRun(jobId, data)) return null;
+  const latestAnalysisRun = [...data.runs]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .find(
       (r) =>
@@ -217,9 +220,13 @@ export function analysisProblem(jobId: string, data: Workspace): string | null {
         r.model !== "none" &&
         r.provider !== "simulated",
     );
-  if (latest && latest.jd_snapshot && latest.jd_snapshot !== job.jd)
+  if (
+    latestAnalysisRun &&
+    latestAnalysisRun.jd_snapshot &&
+    latestAnalysisRun.jd_snapshot !== job.jd
+  )
     return "The job description changed since this analysis. Re-run a real analysis before building a plan.";
-  if (latest?.evidence_snapshot)
+  if (latestAnalysisRun?.evidence_snapshot)
     return "Your experience changed since this analysis. Re-run a real analysis before building a plan.";
   return "Run a current real analysis first.";
 }
@@ -276,20 +283,20 @@ export async function planSources(
   return Promise.all(
     target.jobIds.map(async (id) => {
       const job = data.jobs.find((j) => j.id === id)!,
-        run = matchingRun(id, data)!;
+        analysisRun = matchingAnalysisRun(id, data)!;
       const evidence = JSON.parse(
-        canonicalEvidence(run.evidence_snapshot!),
+        canonicalEvidence(analysisRun.evidence_snapshot!),
       ) as Experience[];
       return sourceSchema.parse({
         jobId: id,
         company: job.company,
         role: job.role,
-        analysisId: run.id,
+        analysisId: analysisRun.id,
         jdSnapshot: job.jd,
         evidenceSnapshot: evidence,
         analysis: (() => {
           try {
-            return validateAnalysis(run.output, evidence);
+            return validateAnalysis(analysisRun.output, evidence);
           } catch {
             throw new SourceError("A stored analysis failed validation.");
           }

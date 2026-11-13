@@ -4,7 +4,7 @@ import {
   canonicalEvidence,
   emptyPreparation,
   emptyProgress,
-  matchingRun,
+  matchingAnalysisRun,
   outdated,
   planSources,
   planSummaries,
@@ -58,7 +58,7 @@ describe("preparation sources and freshness", () => {
       created_at: "2026-10-23T00:00:00.000Z",
       status: "failed",
     });
-    expect(matchingRun("job-a", data)?.id).toBe("run-a");
+    expect(matchingAnalysisRun("job-a", data)?.id).toBe("run-a");
   });
   it("compares evidence independent of ordering and optional provenance", () => {
     const entries = workspace().experience;

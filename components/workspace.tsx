@@ -89,7 +89,7 @@ export default function Workspace() {
     setStatusOpen(false);
     setImported(null);
     setTab(next);
-    ws.setSelectedRun(null);
+    ws.setSelectedAnalysisRunId(null);
     ws.setError("");
   }
   function open(next: Modal) {
@@ -215,9 +215,9 @@ export default function Workspace() {
           )}
         </header>
         {!modal && errorNotice}
-        {ws.busy && !(ws.runningJob && tab === "applications") && (
+        {ws.busy && !(ws.analyzingJobId && tab === "applications") && (
           <div role="status" className="notice">
-            {ws.runningJob
+            {ws.analyzingJobId
               ? "Analysis running. You can review other sections while you wait."
               : "Saving your changes…"}
           </div>
@@ -291,10 +291,12 @@ export default function Workspace() {
             busy={ws.busy}
             aiReady={!!ai.status?.ready}
             ai={ai.status}
-            runningJob={ws.runningJob}
-            selectedRun={ws.selectedRun}
-            onSelectRun={ws.setSelectedRun}
-            onAnalyze={(job, simulated) => ws.runJob(job, ai.status, simulated)}
+            analyzingJobId={ws.analyzingJobId}
+            selectedAnalysisRunId={ws.selectedAnalysisRunId}
+            onSelectAnalysisRun={ws.setSelectedAnalysisRunId}
+            onAnalyze={(job, simulated) =>
+              ws.runFitAnalysis(job, ai.status, simulated)
+            }
             onPrepare={(job) => {
               setPreparationJob(job.id);
               navigate("practice");
@@ -329,7 +331,7 @@ export default function Workspace() {
           }}
           onSummaries={setPlanSummaries}
           onGeneralChange={setGeneralPreparation}
-          analyze={(job) => ws.runJob(job, ai.status)}
+          analyze={(job) => ws.runFitAnalysis(job, ai.status)}
           toggleLegacy={ws.toggleTask}
           shellBusy={ws.busy}
           savingTask={ws.savingTask}

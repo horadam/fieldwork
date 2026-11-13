@@ -47,7 +47,7 @@ sequenceDiagram
       Agent-->>API: Output, duration, usage
       alt Account storage
         API->>DB: finish_analysis() stores completed output
-        API-->>UI: runId
+        API-->>UI: analysisRunId
         UI->>API: Reload owned workspace
         API-->>UI: Saved run and snapshots
       else Browser storage

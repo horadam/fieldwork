@@ -4,7 +4,6 @@ import {
   fitCoverage,
   validateAnalysis,
   type Analysis,
-  type Run,
 } from "../lib/domain";
 import { seed } from "../lib/seed";
 import { cases } from "../evals/cases";
